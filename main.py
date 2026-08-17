@@ -1286,7 +1286,8 @@ class WinExhaleApp(ctk.CTk):
             segmented_button_selected_color=COL_ACCENT_DARK,
             segmented_button_selected_hover_color=COL_ACCENT_HOVER,
             segmented_button_unselected_color=COL_CARD_2,
-            text_color=COL_TEXT)
+            text_color=COL_TEXT,
+            command=self._on_tab_changed)
         self.tabview.grid(row=0, column=0, sticky="nsew")
 
         tab_keys = (
@@ -1302,14 +1303,31 @@ class WinExhaleApp(ctk.CTk):
         for tab_key in tab_keys:
             self.tabview.add(self.t(tab_key))
 
-        self._build_debloat_tab(self.tabview.tab(self.t("tab_debloat")))
-        self._build_privacy_tab(self.tabview.tab(self.t("tab_privacy")))
-        self._build_perf_tab(self.tabview.tab(self.t("tab_perf")))
-        self._build_annoyances_tab(self.tabview.tab(self.t("tab_annoyances")))
-        self._build_dns_tab(self.tabview.tab(self.t("tab_dns")))
-        self._build_apps_tab(self.tabview.tab(self.t("tab_apps")))
-        self._build_startup_tab(self.tabview.tab(self.t("tab_startup")))
-        self._build_clean_tab(self.tabview.tab(self.t("tab_clean")))
+        self._built_tabs = set()
+        self._tab_builders = {
+            self.t("tab_debloat"): self._build_debloat_tab,
+            self.t("tab_privacy"): self._build_privacy_tab,
+            self.t("tab_perf"): self._build_perf_tab,
+            self.t("tab_annoyances"): self._build_annoyances_tab,
+            self.t("tab_dns"): self._build_dns_tab,
+            self.t("tab_apps"): self._build_apps_tab,
+            self.t("tab_startup"): self._build_startup_tab,
+            self.t("tab_clean"): self._build_clean_tab,
+        }
+
+        # Build active initial tab immediately
+        initial_tab = self.t("tab_debloat")
+        self._built_tabs.add(initial_tab)
+        self._build_debloat_tab(self.tabview.tab(initial_tab))
+
+    def _on_tab_changed(self):
+        current_tab = self.tabview.get()
+        if current_tab in self._built_tabs:
+            return
+        self._built_tabs.add(current_tab)
+        builder = self._tab_builders.get(current_tab)
+        if builder:
+            builder(self.tabview.tab(current_tab))
 
     def _build_console(self):
         frame = ctk.CTkFrame(self, fg_color=COL_CARD, corner_radius=12)
@@ -2108,6 +2126,21 @@ def main():
             "WinExhale nécessite des privilèges administrateur.",
             APP_NAME, 0x00000010)
         sys.exit(1)
+
+    # 1. Enable native Windows Per-Monitor DPI Awareness without CustomTkinter's laggy polling
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
+    # 2. Deactivate CustomTkinter's heavy per-pixel <Configure> DPI polling that causes dragging stutter
+    try:
+        ctk.deactivate_automatic_dpi_awareness()
+    except Exception:
+        pass
 
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("dark-blue")
