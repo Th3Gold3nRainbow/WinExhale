@@ -114,7 +114,7 @@ Download the latest multi-language installer wizard with desktop shortcuts and a
 
 ### 1. Clone the Repository
 ```powershell
-git clone https://github.com/Th3Gold3nRainbow/WinExhale.git
+git clone https://github.com/yourusername/WinExhale.git
 cd WinExhale
 ```
 
