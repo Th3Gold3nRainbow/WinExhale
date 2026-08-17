@@ -1213,21 +1213,43 @@ class WinExhaleApp(ctk.CTk):
         except Exception:
             return None
 
+    def _start_window_drag(self, event=None):
+        """Native Win32 window dragging via WM_SYSCOMMAND (SC_MOVE + HTCAPTION).
+        Bypasses Tkinter coordinate calculation completely for 0-latency, 60fps smooth moving."""
+        try:
+            ctypes.windll.user32.ReleaseCapture()
+            hwnd = self.winfo_id()
+            parent = ctypes.windll.user32.GetParent(hwnd)
+            target = parent if parent else hwnd
+            ctypes.windll.user32.SendMessageW(target, 0x0112, 0xF012, 0)
+        except Exception:
+            pass
+
     def _build_header(self):
         self.header = ctk.CTkFrame(self, fg_color="transparent")
         self.header.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 4))
+        self.header.bind("<Button-1>", self._start_window_drag)
 
         logo = self._load_logo()
         if logo:
             self._logo_img = logo
-            ctk.CTkLabel(self.header, image=logo, text="").pack(side="left", padx=(6, 14))
+            logo_lbl = ctk.CTkLabel(self.header, image=logo, text="")
+            logo_lbl.pack(side="left", padx=(6, 14))
+            logo_lbl.bind("<Button-1>", self._start_window_drag)
 
         titles = ctk.CTkFrame(self.header, fg_color="transparent")
         titles.pack(side="left", fill="x", expand=True)
-        ctk.CTkLabel(titles, text=APP_NAME, font=(FONT_FAMILY, 24, "bold"),
-                     text_color=COL_TEXT, anchor="w").pack(anchor="w")
-        ctk.CTkLabel(titles, text=self.t("subtitle"), font=(FONT_FAMILY, 12),
-                     text_color=COL_TEXT_DIM, anchor="w").pack(anchor="w")
+        titles.bind("<Button-1>", self._start_window_drag)
+
+        lbl_app = ctk.CTkLabel(titles, text=APP_NAME, font=(FONT_FAMILY, 24, "bold"),
+                               text_color=COL_TEXT, anchor="w")
+        lbl_app.pack(anchor="w")
+        lbl_app.bind("<Button-1>", self._start_window_drag)
+
+        lbl_sub = ctk.CTkLabel(titles, text=self.t("subtitle"), font=(FONT_FAMILY, 12),
+                               text_color=COL_TEXT_DIM, anchor="w")
+        lbl_sub.pack(anchor="w")
+        lbl_sub.bind("<Button-1>", self._start_window_drag)
 
         right = ctk.CTkFrame(self.header, fg_color="transparent")
         right.pack(side="right", padx=(10, 6))
