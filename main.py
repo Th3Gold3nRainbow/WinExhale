@@ -999,6 +999,30 @@ def get_active_network_adapter():
     name = out.strip().splitlines()[0] if out.strip() else ""
     return name if rc == 0 and name else None
 
+
+def set_dark_titlebar(window):
+    """Enable native Windows immersive dark mode on standard window title bar via DWM API."""
+    if os.name != "nt":
+        return
+    window.update_idletasks()
+    try:
+        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+        if not hwnd:
+            hwnd = window.winfo_id()
+        # DWMWA_USE_IMMERSIVE_DARK_MODE (20 on Windows 11, 19 on Windows 10)
+        value = ctypes.c_int(2)
+        for attr in (20, 19):
+            res = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                attr,
+                ctypes.byref(value),
+                ctypes.sizeof(value)
+            )
+            if res == 0:
+                break
+    except Exception:
+        pass
+
 # ------------------------------------------------------------------- app ----
 
 class WinExhaleApp(ctk.CTk):
@@ -1015,6 +1039,8 @@ class WinExhaleApp(ctk.CTk):
                 self.iconbitmap(icon_path)
             except Exception:
                 pass
+
+        set_dark_titlebar(self)
 
         self.cfg = load_config()
         self.lang = self.cfg.get("language")
@@ -1122,6 +1148,7 @@ class WinExhaleApp(ctk.CTk):
         dlg.attributes("-topmost", True)
         dlg.transient(self)
         dlg.resizable(False, False)
+        set_dark_titlebar(dlg)
         self._lang_dlg = dlg
         self._lang_cancelled = False
         dlg.protocol("WM_DELETE_WINDOW", self._cancel_language)
@@ -1213,43 +1240,21 @@ class WinExhaleApp(ctk.CTk):
         except Exception:
             return None
 
-    def _start_window_drag(self, event=None):
-        """Native Win32 window dragging via WM_SYSCOMMAND (SC_MOVE + HTCAPTION).
-        Bypasses Tkinter coordinate calculation completely for 0-latency, 60fps smooth moving."""
-        try:
-            ctypes.windll.user32.ReleaseCapture()
-            hwnd = self.winfo_id()
-            parent = ctypes.windll.user32.GetParent(hwnd)
-            target = parent if parent else hwnd
-            ctypes.windll.user32.SendMessageW(target, 0x0112, 0xF012, 0)
-        except Exception:
-            pass
-
     def _build_header(self):
         self.header = ctk.CTkFrame(self, fg_color="transparent")
         self.header.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 4))
-        self.header.bind("<Button-1>", self._start_window_drag)
 
         logo = self._load_logo()
         if logo:
             self._logo_img = logo
-            logo_lbl = ctk.CTkLabel(self.header, image=logo, text="")
-            logo_lbl.pack(side="left", padx=(6, 14))
-            logo_lbl.bind("<Button-1>", self._start_window_drag)
+            ctk.CTkLabel(self.header, image=logo, text="").pack(side="left", padx=(6, 14))
 
         titles = ctk.CTkFrame(self.header, fg_color="transparent")
         titles.pack(side="left", fill="x", expand=True)
-        titles.bind("<Button-1>", self._start_window_drag)
-
-        lbl_app = ctk.CTkLabel(titles, text=APP_NAME, font=(FONT_FAMILY, 24, "bold"),
-                               text_color=COL_TEXT, anchor="w")
-        lbl_app.pack(anchor="w")
-        lbl_app.bind("<Button-1>", self._start_window_drag)
-
-        lbl_sub = ctk.CTkLabel(titles, text=self.t("subtitle"), font=(FONT_FAMILY, 12),
-                               text_color=COL_TEXT_DIM, anchor="w")
-        lbl_sub.pack(anchor="w")
-        lbl_sub.bind("<Button-1>", self._start_window_drag)
+        ctk.CTkLabel(titles, text=APP_NAME, font=(FONT_FAMILY, 24, "bold"),
+                     text_color=COL_TEXT, anchor="w").pack(anchor="w")
+        ctk.CTkLabel(titles, text=self.t("subtitle"), font=(FONT_FAMILY, 12),
+                     text_color=COL_TEXT_DIM, anchor="w").pack(anchor="w")
 
         right = ctk.CTkFrame(self.header, fg_color="transparent")
         right.pack(side="right", padx=(10, 6))
