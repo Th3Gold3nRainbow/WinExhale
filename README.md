@@ -4,11 +4,11 @@
 
 **The Ultimate Open-Source Windows Debloater, Privacy Engine & Performance Suite**
 
-[![GitHub Release](https://img.shields.io/github/v/release/TWIX-07/WinExhale?style=for-the-badge&logo=github&color=06B6D4)](https://github.com/TWIX-07/WinExhale/releases/latest)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/TWIX-07/WinExhale)
+[![GitHub Release](https://img.shields.io/github/v/release/Th3Gold3nRainbow/WinExhale?style=for-the-badge&logo=github&color=06B6D4)](https://github.com/Th3Gold3nRainbow/WinExhale/releases/latest)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Th3Gold3nRainbow/WinExhale)
 [![Python Version](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg?style=for-the-badge)](LICENSE)
-[![Downloads](https://img.shields.io/github/downloads/TWIX-07/WinExhale/total?style=for-the-badge&color=8B5CF6&logo=github)](https://github.com/TWIX-07/WinExhale/releases)
+[![Downloads](https://img.shields.io/github/downloads/Th3Gold3nRainbow/WinExhale/total?style=for-the-badge&color=8B5CF6&logo=github)](https://github.com/Th3Gold3nRainbow/WinExhale/releases)
 
 <p align="center">
   <a href="#-key-features">Features</a> •
@@ -79,12 +79,12 @@ Built with Python and a sleek dark CustomTkinter interface, WinExhale gives powe
 
 ### Option A: Setup Installer (Recommended)
 Download the latest multi-language installer wizard with desktop shortcuts and automatic uninstaller:
-1. Go to the [**Latest GitHub Release**](https://github.com/TWIX-07/WinExhale/releases/latest).
+1. Go to the [**Latest GitHub Release**](https://github.com/Th3Gold3nRainbow/WinExhale/releases/latest).
 2. Download `WinExhale_Setup.exe`.
 3. Run the installer and follow the setup wizard.
 
 ### Option B: Standalone Portable EXE
-1. Download `WinExhale.exe` directly from the [**Releases Page**](https://github.com/TWIX-07/WinExhale/releases/latest).
+1. Download `WinExhale.exe` directly from the [**Releases Page**](https://github.com/Th3Gold3nRainbow/WinExhale/releases/latest).
 2. Run `WinExhale.exe` anywhere (USB drive, Desktop). Requires Administrator elevation (UAC prompt).
 
 ---
@@ -98,7 +98,7 @@ Download the latest multi-language installer wizard with desktop shortcuts and a
 
 ### 1. Clone the Repository
 ```powershell
-git clone https://github.com/TWIX-07/WinExhale.git
+git clone https://github.com/Th3Gold3nRainbow/WinExhale.git
 cd WinExhale
 ```
 
@@ -150,7 +150,7 @@ Contributions, issues, and feature requests are welcome!
 4. Push to the Branch (`git push origin feature/AmazingFeature`).
 5. Open a Pull Request.
 
-Please check our [Issue Tracker](https://github.com/TWIX-07/WinExhale/issues) to report bugs or request new features.
+Please check our [Issue Tracker](https://github.com/Th3Gold3nRainbow/WinExhale/issues) to report bugs or request new features.
 
 ---
 
