@@ -1,15 +1,22 @@
 """
-WinExhale — Windows Debloater, Privacy & Performance Suite (v1.1.0)
+WinExhale — Windows Debloater, Privacy & Performance Suite (v1.2.0)
 
 Features
   * English / French UI, chosen on first launch, stored in winexhale_config.json
   * Dark theme with cyan accents (customtkinter)
   * Auto elevation to Administrator via ShellExecuteW
-  * Tabs: UWP debloat, privacy & telemetry, performance, startup manager,
-    junk cleaner
+  * Modules:
+      1. UWP Debloater
+      2. Privacy & Telemetry Hardening
+      3. Performance & Game Mode
+      4. Windows Annoyances & QoL Registry Tweaks
+      5. DNS Optimizer & Live Latency Benchmarking
+      6. App Installer (Winget integration)
+      7. Startup Manager (non-destructive registry/folder backup)
+      8. Deep Junk & Cache Cleaner
   * Timestamped live console, all system work in background threads
 
-Runtime requirements:  pip install customtkinter pillow
+Runtime requirements:  pip install customtkinter pillow pywin32
 """
 
 import ctypes
@@ -18,10 +25,12 @@ import os
 import queue
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import winreg
 from datetime import datetime
 
@@ -41,7 +50,7 @@ if getattr(sys, "frozen", False):
             setattr(sys, _name, open(os.devnull, "w"))
 
 APP_NAME = "WinExhale"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 # ---------------------------------------------------------------- palette ---
 COL_BG = "#0B1220"
@@ -204,18 +213,32 @@ TRANSLATIONS = {
         "btn_restore_point": "Create System Restore Point",
         "console_title": "Live Console",
         "btn_clear": "Clear",
+
+        # Tabs
         "tab_debloat": "Debloat",
         "tab_privacy": "Privacy",
         "tab_perf": "Performance",
+        "tab_annoyances": "Annoyances",
+        "tab_dns": "DNS Optimizer",
+        "tab_apps": "App Installer",
+        "tab_startup": "Startup",
         "tab_clean": "Junk Cleaner",
-        "debloat_desc": "Select the preinstalled applications you want to remove, then click the button. "
-                        "UWP apps are removed for the current user.",
+
+        # Common buttons
         "btn_select_all": "Select all",
         "btn_deselect_all": "Deselect all",
+
+        # Debloat Tab
+        "debloat_desc": "Select the preinstalled applications you want to remove, then click the button. "
+                        "UWP apps are removed cleanly for the current user.",
         "btn_apply_debloat": "Remove selected apps",
+
+        # Privacy Tab
         "privacy_desc": "Apply safe, reversible privacy tweaks to reduce telemetry and data collection. "
                         "A System Restore point can revert everything.",
         "btn_apply_privacy": "Apply privacy settings",
+
+        # Performance Tab
         "perf_desc": "One-click optimizations: disable unneeded background services and switch to the "
                      "High Performance power plan. 'Restore defaults' reverts these changes.",
         "switch_sysmain": "Disable SysMain (Superfetch)",
@@ -223,6 +246,34 @@ TRANSLATIONS = {
         "switch_powerplan": "High Performance power plan",
         "btn_apply_perf": "Optimize now",
         "btn_restore_perf": "Restore defaults",
+
+        # Annoyances Tab
+        "annoyances_desc": "Disable common Windows irritations, advertisements, and unwanted background suggestions. "
+                           "Toggles can be applied or reverted at any time.",
+        "btn_apply_annoyances": "Apply selected tweaks",
+        "btn_restore_annoyances": "Restore defaults",
+
+        # DNS Tab
+        "dns_desc": "Benchmark public DNS resolvers for lowest latency and apply the fastest server to your active network adapter.",
+        "dns_adapter_label": "Active Network Adapter:",
+        "dns_adapter_detecting": "Detecting active network adapter...",
+        "dns_adapter_none": "No active network adapter detected.",
+        "btn_benchmark_dns": "Benchmark DNS",
+        "btn_apply_dns": "Apply Selected DNS",
+        "btn_reset_dns": "Reset to DHCP (Default)",
+        "dns_latency_measuring": "Testing...",
+        "dns_fastest_badge": "FASTEST",
+
+        # App Installer Tab
+        "apps_desc": "Select popular open-source and freeware software to install automatically via Windows Package Manager (winget).",
+        "btn_install_apps": "Install Selected Apps",
+        "cat_browsers": "🌐 Web Browsers",
+        "cat_utilities": "🛠️ Utilities & Tools",
+        "cat_media": "🎬 Media & Audio",
+        "cat_gaming": "🎮 Gaming & Communication",
+        "cat_dev": "💻 Developer Tools",
+
+        # Clean Tab
         "clean_desc": "Clean temporary files, the DNS cache and GPU shader caches. "
                       "Locked files are skipped automatically.",
         "switch_user_temp": "User temporary files",
@@ -234,6 +285,8 @@ TRANSLATIONS = {
         "clean_user_temp": "user temp",
         "clean_win_temp": "Windows temp",
         "clean_shader": "shader caches",
+
+        # Startup Tab
         "tab_startup": "Startup",
         "startup_desc": "Manage the programs that start automatically with Windows. Disabling an item moves it to a "
                         "safe backup (the Run\\WinExhale_Disabled registry subkey, or the WinExhale backup folder) "
@@ -242,6 +295,8 @@ TRANSLATIONS = {
         "startup_status": "{n} item(s), {d} disabled",
         "startup_empty": "No startup items found.",
         "src_folder": "Folder",
+
+        # Logs
         "log_startup_scan": "Scanning startup entries...",
         "log_startup_scan_done": "Found {n} startup item(s).",
         "log_startup_disable": "Disabled: {name} ({source}) — backed up safely.",
@@ -273,6 +328,34 @@ TRANSLATIONS = {
         "log_pp_err": "Could not change the power plan.",
         "log_perf_done": "Performance optimizations applied.",
         "log_perf_restored": "Defaults restored.",
+
+        # Annoyances Logs
+        "log_annoy_start": "Applying {n} Windows Quality-of-Life tweak(s)...",
+        "log_annoy_restore": "Restoring defaults for {n} tweak(s)...",
+        "log_annoy_done": "Windows Quality-of-Life tweaks applied.",
+        "log_annoy_restored": "Default settings restored.",
+
+        # DNS Logs
+        "log_dns_bench_start": "Benchmarking DNS resolvers (3 iterations each)...",
+        "log_dns_bench_res": "{name} ({ip}) -> Latency: {ms} ms",
+        "log_dns_bench_fail": "{name} ({ip}) -> Timeout / unreachable",
+        "log_dns_bench_done": "Benchmark complete. Fastest resolver: {name} ({ms} ms).",
+        "log_dns_applying": "Setting DNS for adapter '{adapter}' to {name} ({p}, {s})...",
+        "log_dns_applied": "DNS applied successfully. Flushing DNS resolver cache...",
+        "log_dns_resetting": "Resetting DNS for adapter '{adapter}' to DHCP...",
+        "log_dns_reset": "DNS reset to DHCP (Automatic). Flushing DNS resolver cache...",
+        "log_dns_err": "DNS configuration failed: {err}",
+        "log_dns_no_adapter": "Error: No active network adapter available.",
+
+        # App Installer Logs
+        "log_winget_missing": "Error: winget (Windows Package Manager) was not found in PATH. Please install it from Microsoft Store.",
+        "log_apps_start": "Starting automated installation of {n} application(s)...",
+        "log_app_start": "Installing {name} ({id})...",
+        "log_app_ok": "Successfully installed {name}.",
+        "log_app_warn": "Installation finished with code {rc}: {name}",
+        "log_apps_done": "All selected applications processed.",
+
+        # Clean Logs
         "log_clean_start": "Scanning and cleaning selected targets...",
         "log_clean_target": "Cleaning {name}...",
         "log_clean_result": "{path} -> {size} freed ({files} files deleted, {failed} skipped)",
@@ -288,18 +371,32 @@ TRANSLATIONS = {
         "btn_restore_point": "Créer un point de restauration",
         "console_title": "Journal en direct",
         "btn_clear": "Effacer",
+
+        # Tabs
         "tab_debloat": "Débloater",
         "tab_privacy": "Confidentialité",
         "tab_perf": "Performance",
+        "tab_annoyances": "Agressions Windows",
+        "tab_dns": "Optimiseur DNS",
+        "tab_apps": "Installateur d'apps",
+        "tab_startup": "Démarrage",
         "tab_clean": "Nettoyage",
-        "debloat_desc": "Sélectionnez les applications préinstallées à supprimer, puis cliquez sur le bouton. "
-                        "Les applications UWP sont retirées pour l'utilisateur actuel.",
+
+        # Common buttons
         "btn_select_all": "Tout sélectionner",
         "btn_deselect_all": "Tout désélectionner",
+
+        # Debloat Tab
+        "debloat_desc": "Sélectionnez les applications préinstallées à supprimer, puis cliquez sur le bouton. "
+                        "Les applications UWP sont retirées proprement pour l'utilisateur actuel.",
         "btn_apply_debloat": "Supprimer les apps sélectionnées",
+
+        # Privacy Tab
         "privacy_desc": "Applique des réglages sûrs et réversibles pour réduire la télémétrie. "
                         "Un point de restauration permet de tout annuler.",
         "btn_apply_privacy": "Appliquer les réglages",
+
+        # Performance Tab
         "perf_desc": "Optimisation en un clic : désactive les services inutiles en arrière-plan et active le plan "
                      "d'alimentation Haute performance. « Rétablir les défauts » annule ces changements.",
         "switch_sysmain": "Désactiver SysMain (Superfetch)",
@@ -307,6 +404,34 @@ TRANSLATIONS = {
         "switch_powerplan": "Plan d'alimentation Haute performance",
         "btn_apply_perf": "Optimiser maintenant",
         "btn_restore_perf": "Rétablir les défauts",
+
+        # Annoyances Tab
+        "annoyances_desc": "Désactivez les irritations courantes, publicités et suggestions indésirables de Windows. "
+                           "Les réglages peuvent être appliqués ou annulés à tout moment.",
+        "btn_apply_annoyances": "Appliquer les réglages",
+        "btn_restore_annoyances": "Rétablir les défauts",
+
+        # DNS Tab
+        "dns_desc": "Mesurez la latence des serveurs DNS publics et appliquez le plus rapide à votre carte réseau active.",
+        "dns_adapter_label": "Carte réseau active :",
+        "dns_adapter_detecting": "Détection de la carte réseau active...",
+        "dns_adapter_none": "Aucune carte réseau active détectée.",
+        "btn_benchmark_dns": "Tester la latence DNS",
+        "btn_apply_dns": "Appliquer le DNS sélectionné",
+        "btn_reset_dns": "Rétablir DHCP (Par défaut)",
+        "dns_latency_measuring": "Mesure...",
+        "dns_fastest_badge": "PLUS RAPIDE",
+
+        # App Installer Tab
+        "apps_desc": "Sélectionnez les logiciels open-source et gratuits à installer automatiquement via Windows Package Manager (winget).",
+        "btn_install_apps": "Installer les apps sélectionnées",
+        "cat_browsers": "🌐 Navigateurs Web",
+        "cat_utilities": "🛠️ Utilitaires & Outils",
+        "cat_media": "🎬 Multimédia & Audio",
+        "cat_gaming": "🎮 Jeux & Communication",
+        "cat_dev": "💻 Outils Développeur",
+
+        # Clean Tab
         "clean_desc": "Nettoie les fichiers temporaires, le cache DNS et les caches de shaders GPU. "
                       "Les fichiers verrouillés sont ignorés automatiquement.",
         "switch_user_temp": "Fichiers temporaires utilisateur",
@@ -318,6 +443,8 @@ TRANSLATIONS = {
         "clean_user_temp": "temp utilisateur",
         "clean_win_temp": "temp Windows",
         "clean_shader": "caches de shaders",
+
+        # Startup Tab
         "tab_startup": "Démarrage",
         "startup_desc": "Gérez les programmes lancés automatiquement avec Windows. La désactivation déplace "
                         "l'élément vers une sauvegarde sûre (sous-clé de registre Run\\WinExhale_Disabled ou "
@@ -326,6 +453,8 @@ TRANSLATIONS = {
         "startup_status": "{n} élément(s), {d} désactivé(s)",
         "startup_empty": "Aucun élément de démarrage trouvé.",
         "src_folder": "Dossier",
+
+        # Logs
         "log_startup_scan": "Analyse des programmes au démarrage...",
         "log_startup_scan_done": "{n} élément(s) de démarrage trouvé(s).",
         "log_startup_disable": "Désactivé : {name} ({source}) — sauvegardé en sécurité.",
@@ -357,6 +486,34 @@ TRANSLATIONS = {
         "log_pp_err": "Impossible de changer de plan d'alimentation.",
         "log_perf_done": "Optimisations appliquées.",
         "log_perf_restored": "Défauts rétablis.",
+
+        # Annoyances Logs
+        "log_annoy_start": "Application de {n} réglage(s) de confort Windows...",
+        "log_annoy_restore": "Rétablissement des réglages par défaut pour {n} élément(s)...",
+        "log_annoy_done": "Réglages de confort Windows appliqués.",
+        "log_annoy_restored": "Réglages par défaut rétablis.",
+
+        # DNS Logs
+        "log_dns_bench_start": "Test de latence des serveurs DNS (3 passes)...",
+        "log_dns_bench_res": "{name} ({ip}) -> Latence : {ms} ms",
+        "log_dns_bench_fail": "{name} ({ip}) -> Délai dépassé / inaccessible",
+        "log_dns_bench_done": "Test terminé. Résolveur le plus rapide : {name} ({ms} ms).",
+        "log_dns_applying": "Configuration du DNS pour '{adapter}' : {name} ({p}, {s})...",
+        "log_dns_applied": "DNS configuré avec succès. Vidage du cache DNS...",
+        "log_dns_resetting": "Rétablissement du DNS en DHCP pour la carte '{adapter}'...",
+        "log_dns_reset": "DNS rétabli en DHCP (Automatique). Vidage du cache DNS...",
+        "log_dns_err": "Échec de la configuration DNS : {err}",
+        "log_dns_no_adapter": "Erreur : Aucune carte réseau active disponible.",
+
+        # App Installer Logs
+        "log_winget_missing": "Erreur : winget (Windows Package Manager) est introuvable. Veuillez l'installer depuis le Microsoft Store.",
+        "log_apps_start": "Démarrage de l'installation automatisée de {n} application(s)...",
+        "log_app_start": "Installation de {name} ({id})...",
+        "log_app_ok": "Installation réussie de {name}.",
+        "log_app_warn": "Installation terminée avec le code {rc} : {name}",
+        "log_apps_done": "Toutes les applications sélectionnées ont été traitées.",
+
+        # Clean Logs
         "log_clean_start": "Analyse et nettoyage des cibles sélectionnées...",
         "log_clean_target": "Nettoyage de {name}...",
         "log_clean_result": "{path} -> {size} libérés ({files} fichiers supprimés, {failed} ignorés)",
@@ -459,6 +616,170 @@ PRIVACY_ITEMS = [
     },
 ]
 
+# -------------------------------------------------- Windows Annoyances Tweaks -
+
+ANNOYANCE_ITEMS = [
+    {
+        "key": "sticky_keys",
+        "title": {"en": "Disable Sticky Keys prompt (Shift 5 times)",
+                  "fr": "Désactiver le raccourci des touches rémanentes (Maj 5x)"},
+        "desc": {"en": "Prevents popup prompts when pressing Shift 5 times in games.",
+                 "fr": "Empêche l'apparition de la boîte de dialogue lors de frappes répétées sur Maj."},
+        "tweak_regs": [
+            (r"HKCU\Control Panel\Accessibility\StickyKeys", "Flags", "REG_SZ", "506"),
+        ],
+        "default_regs": [
+            (r"HKCU\Control Panel\Accessibility\StickyKeys", "Flags", "REG_SZ", "510"),
+        ],
+    },
+    {
+        "key": "bing_search",
+        "title": {"en": "Disable Bing web search in Start Menu",
+                  "fr": "Désactiver la recherche web Bing dans le menu Démarrer"},
+        "desc": {"en": "Restricts search to local files and apps without querying Bing servers.",
+                 "fr": "Limite la recherche aux fichiers locaux sans interroger les serveurs Bing."},
+        "tweak_regs": [
+            (r"HKCU\Software\Policies\Microsoft\Windows\Explorer", "DisableSearchBoxSuggestions", "REG_DWORD", "1"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Search", "BingSearchEnabled", "REG_DWORD", "0"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Search", "CortanaConsent", "REG_DWORD", "0"),
+        ],
+        "default_regs": [
+            (r"HKCU\Software\Policies\Microsoft\Windows\Explorer", "DisableSearchBoxSuggestions", "REG_DWORD", "0"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Search", "BingSearchEnabled", "REG_DWORD", "1"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Search", "CortanaConsent", "REG_DWORD", "1"),
+        ],
+    },
+    {
+        "key": "lock_screen_ads",
+        "title": {"en": "Disable Lock Screen ads, tips & suggestions",
+                  "fr": "Désactiver les pubs et astuces sur l'écran de verrouillage"},
+        "desc": {"en": "Removes promotional content, trivia, and marketing suggestions on the lock screen.",
+                 "fr": "Supprime les suggestions promotionnelles et astuces sur l'écran de verrouillage."},
+        "tweak_regs": [
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338387Enabled", "REG_DWORD", "0"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "RotatingLockScreenOverlayEnabled", "REG_DWORD", "0"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-310093Enabled", "REG_DWORD", "0"),
+        ],
+        "default_regs": [
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-338387Enabled", "REG_DWORD", "1"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "RotatingLockScreenOverlayEnabled", "REG_DWORD", "1"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager", "SubscribedContent-310093Enabled", "REG_DWORD", "1"),
+        ],
+    },
+    {
+        "key": "taskbar_widgets",
+        "title": {"en": "Disable Taskbar Widgets / News & Interests",
+                  "fr": "Désactiver les widgets et actualités de la barre des tâches"},
+        "desc": {"en": "Hides the widgets feed button and news ticker from the Windows taskbar.",
+                 "fr": "Masque le bouton des widgets et les actualités de la barre des tâches."},
+        "tweak_regs": [
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarDa", "REG_DWORD", "0"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Feeds", "ShellFeedsTaskbarViewMode", "REG_DWORD", "2"),
+        ],
+        "default_regs": [
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarDa", "REG_DWORD", "1"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Feeds", "ShellFeedsTaskbarViewMode", "REG_DWORD", "0"),
+        ],
+    },
+    {
+        "key": "show_hidden_ext",
+        "title": {"en": "Show hidden files & file extensions by default",
+                  "fr": "Afficher les fichiers cachés et extensions de fichiers"},
+        "desc": {"en": "Always display file extensions (.exe, .txt) and hidden system folders in Explorer.",
+                 "fr": "Affiche toujours les extensions de fichiers et éléments masqués dans l'Explorateur."},
+        "tweak_regs": [
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt", "REG_DWORD", "0"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden", "REG_DWORD", "1"),
+        ],
+        "default_regs": [
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "HideFileExt", "REG_DWORD", "1"),
+            (r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "Hidden", "REG_DWORD", "2"),
+        ],
+    },
+]
+
+# ------------------------------------------------------------- DNS Servers ---
+
+DNS_SERVERS = [
+    {
+        "key": "cloudflare",
+        "name": "Cloudflare",
+        "primary": "1.1.1.1",
+        "secondary": "1.0.0.1",
+        "desc": {"en": "Fastest public resolver & privacy focused (1.1.1.1 / 1.0.0.1)",
+                 "fr": "Résolveur ultra-rapide et respectueux de la vie privée (1.1.1.1 / 1.0.0.1)"}
+    },
+    {
+        "key": "google",
+        "name": "Google Public DNS",
+        "primary": "8.8.8.8",
+        "secondary": "8.8.4.4",
+        "desc": {"en": "Reliable global infrastructure & speed (8.8.8.8 / 8.8.4.4)",
+                 "fr": "Infrastructure mondiale ultra-fiable et rapide (8.8.8.8 / 8.8.4.4)"}
+    },
+    {
+        "key": "quad9",
+        "name": "Quad9 (Security)",
+        "primary": "9.9.9.9",
+        "secondary": "149.112.112.112",
+        "desc": {"en": "Blocks malicious domains, phishing & malware (9.9.9.9 / 149.112.112.112)",
+                 "fr": "Bloque les domaines malveillants, phishing et malwares (9.9.9.9 / 149.112.112.112)"}
+    },
+    {
+        "key": "adguard",
+        "name": "AdGuard (Ad-blocking)",
+        "primary": "94.140.14.14",
+        "secondary": "94.140.15.15",
+        "desc": {"en": "Blocks ads, trackers, and malicious domains (94.140.14.14 / 94.140.15.15)",
+                 "fr": "Bloque publicités, traceurs et domaines malveillants (94.140.14.14 / 94.140.15.15)"}
+    },
+]
+
+# ----------------------------------------------------- App Packages (Winget) -
+
+APP_PACKAGES = [
+    {
+        "category": "cat_browsers",
+        "apps": [
+            {"name": "Brave Browser", "id": "Brave.Brave", "desc": "Fast & private browser with adblock"},
+            {"name": "Mozilla Firefox", "id": "Mozilla.Firefox", "desc": "Fast, customizable open-source browser"},
+            {"name": "Google Chrome", "id": "Google.Chrome", "desc": "Google's popular web browser"},
+        ]
+    },
+    {
+        "category": "cat_utilities",
+        "apps": [
+            {"name": "7-Zip", "id": "7zip.7zip", "desc": "High-compression file archiver"},
+            {"name": "Notepad++", "id": "Notepad++.Notepad++", "desc": "Lightweight code & text editor"},
+            {"name": "Microsoft PowerToys", "id": "Microsoft.PowerToys", "desc": "System utilities for power users"},
+        ]
+    },
+    {
+        "category": "cat_media",
+        "apps": [
+            {"name": "VLC Media Player", "id": "VideoLAN.VLC", "desc": "Universal multimedia player"},
+            {"name": "OBS Studio", "id": "OBSProject.OBSStudio", "desc": "Live streaming & video recording"},
+            {"name": "Spotify", "id": "Spotify.Spotify", "desc": "Digital music streaming service"},
+        ]
+    },
+    {
+        "category": "cat_gaming",
+        "apps": [
+            {"name": "Steam", "id": "Valve.Steam", "desc": "Digital gaming distribution platform"},
+            {"name": "Discord", "id": "Discord.Discord", "desc": "Voice, video, and text communication"},
+            {"name": "Epic Games Launcher", "id": "EpicGames.EpicGamesLauncher", "desc": "Gaming store & Unreal hub"},
+        ]
+    },
+    {
+        "category": "cat_dev",
+        "apps": [
+            {"name": "Visual Studio Code", "id": "Microsoft.VisualStudioCode", "desc": "Code editing redefined"},
+            {"name": "Git", "id": "Git.Git", "desc": "Distributed version control system"},
+            {"name": "Python 3.12", "id": "Python.Python.3.12", "desc": "Python programming language runtime"},
+        ]
+    },
+]
+
 # ------------------------------------------------------- script builders ----
 
 def ps_remove_appx(pattern):
@@ -556,10 +877,7 @@ def save_backup_index(entries):
 
 
 def scan_startup_items():
-    """Collect autorun entries from the HKCU/HKLM Run keys and the startup
-    folder. Disabled registry values live in Run\\WinExhale_Disabled and
-    disabled folder files in the WinExhale backup folder; both are reported
-    so the user can re-enable them."""
+    """Collect autorun entries from HKCU/HKLM Run keys and startup folder."""
     items = []
     hives = (
         ("HKCU", winreg.HKEY_CURRENT_USER, RUN_KEY_HKCU),
@@ -587,8 +905,8 @@ def scan_startup_items():
             fpath = os.path.join(STARTUP_FOLDER, fname)
             if os.path.isfile(fpath) and fname.lower().endswith(FOLDER_EXTS):
                 items.append({"source": "Folder", "name": fname,
-                              "command": fpath, "vtype": None,
-                              "disabled": False})
+                               "command": fpath, "vtype": None,
+                               "disabled": False})
     for entry in load_backup_index():
         backup_path = os.path.join(BACKUP_DIR, entry.get("file", ""))
         if os.path.isfile(backup_path):
@@ -599,8 +917,6 @@ def scan_startup_items():
 
 
 def startup_toggle_registry(item, disable):
-    """Move a Run value to/from the WinExhale_Disabled backup subkey,
-    preserving its original type (REG_SZ / REG_EXPAND_SZ)."""
     root = (winreg.HKEY_CURRENT_USER if item["source"] == "HKCU"
             else winreg.HKEY_LOCAL_MACHINE)
     subkey = RUN_KEY_HKCU if item["source"] == "HKCU" else RUN_KEY_HKLM
@@ -615,14 +931,13 @@ def startup_toggle_registry(item, disable):
 
 
 def startup_toggle_folder(item, disable):
-    """Move a startup-folder file to/from the WinExhale backup folder."""
     os.makedirs(BACKUP_DIR, exist_ok=True)
     index = load_backup_index()
     if disable:
         src = os.path.join(STARTUP_FOLDER, item["name"])
         dst = os.path.join(BACKUP_DIR, item["name"])
         counter = 1
-        while os.path.exists(dst):                     # never overwrite backups
+        while os.path.exists(dst):
             stem, ext = os.path.splitext(item["name"])
             dst = os.path.join(BACKUP_DIR, f"{stem}_{counter}{ext}")
             counter += 1
@@ -639,6 +954,51 @@ def startup_toggle_folder(item, disable):
         index.remove(entry)
     save_backup_index(index)
 
+# --------------------------------------------------------- DNS Benchmark ----
+
+def measure_dns_latency(ip, port=53, timeout=1.5, iterations=3):
+    """Measure average socket or ping latency to a DNS server across iterations."""
+    latencies = []
+    for _ in range(iterations):
+        t0 = time.perf_counter()
+        sock = None
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            sock.connect((ip, port))
+            sock.close()
+            t1 = time.perf_counter()
+            latencies.append((t1 - t0) * 1000.0)
+        except Exception:
+            try:
+                if sock:
+                    sock.close()
+            except Exception:
+                pass
+        time.sleep(0.04)
+
+    if not latencies:
+        # Fallback to ICMP ping
+        _rc, out = run_simple(["ping", "-n", "2", "-w", "1000", ip], timeout=5)
+        m = re.search(r"Average = (\d+)ms|Moyenne = (\d+)ms", out or "")
+        if m:
+            val = float(m.group(1) or m.group(2))
+            return val
+        return None
+    return sum(latencies) / len(latencies)
+
+
+def get_active_network_adapter():
+    """Detect active network interface alias using PowerShell."""
+    script = (
+        "$adapter = Get-NetAdapter | Where-Object Status -eq 'Up' | "
+        "Sort-Object LinkSpeed -Descending | Select-Object -First 1 -ExpandProperty Name\n"
+        "if ($adapter) { Write-Output $adapter } else { Write-Output '' }"
+    )
+    rc, out = run_powershell(script, timeout=15)
+    name = out.strip().splitlines()[0] if out.strip() else ""
+    return name if rc == 0 and name else None
+
 # ------------------------------------------------------------------- app ----
 
 class WinExhaleApp(ctk.CTk):
@@ -646,8 +1006,8 @@ class WinExhaleApp(ctk.CTk):
     def __init__(self):
         super().__init__(fg_color=COL_BG)
         self.title(f"{APP_NAME} {APP_VERSION}")
-        self.geometry("1100x780")
-        self.minsize(980, 700)
+        self.geometry("1120x820")
+        self.minsize(1000, 720)
 
         icon_path = find_resource("app_icon.ico")
         if icon_path:
@@ -673,8 +1033,6 @@ class WinExhaleApp(ctk.CTk):
         self._build_console()
         self.after(100, self._poll_log_queue)
         if self.lang is None:
-            # Defer the language modal until the event loop is running; a
-            # Toplevel + grab created before mainloop is unreliable on Windows.
             self.after(150, self._startup_language_flow)
         else:
             self.rebuild_ui()
@@ -735,7 +1093,7 @@ class WinExhaleApp(ctk.CTk):
         def wrap():
             try:
                 fn(*args)
-            except Exception as exc:                       # keep the UI alive no matter what
+            except Exception as exc:
                 self.log(self.t("log_task_error", err=exc), "error")
             finally:
                 self._post(self._task_finished)
@@ -773,13 +1131,13 @@ class WinExhaleApp(ctk.CTk):
         ctk.CTkLabel(dlg, text="Choisissez votre langue", font=(FONT_FAMILY, 13),
                      text_color=COL_TEXT_DIM).pack(pady=(0, 20))
         ctk.CTkButton(dlg, text="English", width=280, height=44, corner_radius=10,
-                      font=(FONT_FAMILY, 15, "bold"), fg_color=COL_ACCENT,
-                      hover_color=COL_ACCENT_HOVER, text_color=COL_ON_ACCENT,
-                      command=lambda: self._pick_language("en")).pack(pady=6)
+                       font=(FONT_FAMILY, 15, "bold"), fg_color=COL_ACCENT,
+                       hover_color=COL_ACCENT_HOVER, text_color=COL_ON_ACCENT,
+                       command=lambda: self._pick_language("en")).pack(pady=6)
         ctk.CTkButton(dlg, text="Français", width=280, height=44, corner_radius=10,
-                      font=(FONT_FAMILY, 15, "bold"), fg_color=COL_CARD_2,
-                      hover_color=COL_ACCENT_DARK, text_color=COL_TEXT,
-                      command=lambda: self._pick_language("fr")).pack(pady=6)
+                       font=(FONT_FAMILY, 15, "bold"), fg_color=COL_CARD_2,
+                       hover_color=COL_ACCENT_DARK, text_color=COL_TEXT,
+                       command=lambda: self._pick_language("fr")).pack(pady=6)
         ctk.CTkLabel(dlg, text="You can change this later from the header — Modifiable plus tard.",
                      font=(FONT_FAMILY, 10), text_color=COL_TEXT_DIM).pack(pady=(16, 0))
 
@@ -795,7 +1153,6 @@ class WinExhaleApp(ctk.CTk):
         self.wait_window(dlg)
 
     def _startup_language_flow(self):
-        """Runs once the mainloop is live: show the picker, then build the UI."""
         try:
             self._ask_language()
         except Exception as exc:
@@ -862,7 +1219,7 @@ class WinExhaleApp(ctk.CTk):
 
         logo = self._load_logo()
         if logo:
-            self._logo_img = logo                     # keep a reference (Tk GC)
+            self._logo_img = logo
             ctk.CTkLabel(self.header, image=logo, text="").pack(side="left", padx=(6, 14))
 
         titles = ctk.CTkFrame(self.header, fg_color="transparent")
@@ -905,12 +1262,25 @@ class WinExhaleApp(ctk.CTk):
             text_color=COL_TEXT)
         self.tabview.grid(row=0, column=0, sticky="nsew")
 
-        for tab_key in ("tab_debloat", "tab_privacy", "tab_perf", "tab_startup", "tab_clean"):
+        tab_keys = (
+            "tab_debloat",
+            "tab_privacy",
+            "tab_perf",
+            "tab_annoyances",
+            "tab_dns",
+            "tab_apps",
+            "tab_startup",
+            "tab_clean",
+        )
+        for tab_key in tab_keys:
             self.tabview.add(self.t(tab_key))
 
         self._build_debloat_tab(self.tabview.tab(self.t("tab_debloat")))
         self._build_privacy_tab(self.tabview.tab(self.t("tab_privacy")))
         self._build_perf_tab(self.tabview.tab(self.t("tab_perf")))
+        self._build_annoyances_tab(self.tabview.tab(self.t("tab_annoyances")))
+        self._build_dns_tab(self.tabview.tab(self.t("tab_dns")))
+        self._build_apps_tab(self.tabview.tab(self.t("tab_apps")))
         self._build_startup_tab(self.tabview.tab(self.t("tab_startup")))
         self._build_clean_tab(self.tabview.tab(self.t("tab_clean")))
 
@@ -926,7 +1296,7 @@ class WinExhaleApp(ctk.CTk):
             hover_color=COL_ACCENT_DARK, text_color=COL_TEXT, command=self._clear_console)
         self.console_clear_btn.pack(side="right", padx=10, pady=(6, 0))
 
-        self.console = ctk.CTkTextbox(frame, height=190, font=(FONT_MONO, 11),
+        self.console = ctk.CTkTextbox(frame, height=185, font=(FONT_MONO, 11),
                                       fg_color=COL_CONSOLE_BG, text_color=COL_TEXT,
                                       wrap="word", border_width=0)
         self.console.pack(fill="both", expand=True, padx=10, pady=(6, 10))
@@ -942,7 +1312,7 @@ class WinExhaleApp(ctk.CTk):
 
     def _build_debloat_tab(self, tab):
         ctk.CTkLabel(tab, text=self.t("debloat_desc"), font=(FONT_FAMILY, 11),
-                     text_color=COL_TEXT_DIM, wraplength=900, justify="left",
+                     text_color=COL_TEXT_DIM, wraplength=940, justify="left",
                      anchor="w").pack(anchor="w", padx=16, pady=(10, 4))
 
         bar = ctk.CTkFrame(tab, fg_color="transparent")
@@ -1011,7 +1381,7 @@ class WinExhaleApp(ctk.CTk):
 
     def _build_privacy_tab(self, tab):
         ctk.CTkLabel(tab, text=self.t("privacy_desc"), font=(FONT_FAMILY, 11),
-                     text_color=COL_TEXT_DIM, wraplength=900, justify="left",
+                     text_color=COL_TEXT_DIM, wraplength=940, justify="left",
                      anchor="w").pack(anchor="w", padx=16, pady=(10, 4))
         btn = ctk.CTkButton(tab, text=self.t("btn_apply_privacy"), width=240, height=34,
                             corner_radius=8, font=(FONT_FAMILY, 12, "bold"),
@@ -1033,7 +1403,7 @@ class WinExhaleApp(ctk.CTk):
                          font=(FONT_FAMILY, 12, "bold"), text_color=COL_TEXT,
                          anchor="w").pack(anchor="w")
             ctk.CTkLabel(texts, text=item["desc"][self.lang], font=(FONT_FAMILY, 11),
-                         text_color=COL_TEXT_DIM, anchor="w", wraplength=660,
+                         text_color=COL_TEXT_DIM, anchor="w", wraplength=680,
                          justify="left").pack(anchor="w")
             var = ctk.BooleanVar(value=False)
             ctk.CTkSwitch(row, text="", variable=var, width=56,
@@ -1080,7 +1450,7 @@ class WinExhaleApp(ctk.CTk):
 
     def _build_perf_tab(self, tab):
         ctk.CTkLabel(tab, text=self.t("perf_desc"), font=(FONT_FAMILY, 11),
-                     text_color=COL_TEXT_DIM, wraplength=900, justify="left",
+                     text_color=COL_TEXT_DIM, wraplength=940, justify="left",
                      anchor="w").pack(anchor="w", padx=16, pady=(10, 4))
 
         body = ctk.CTkFrame(tab, fg_color=COL_CARD_2)
@@ -1130,7 +1500,6 @@ class WinExhaleApp(ctk.CTk):
         rc, _out = run_simple(["powercfg", "/setactive", guid])
         if rc == 0:
             return True
-        # The High Performance scheme can be absent on some OEM images: recreate it.
         _rc2, out2 = run_simple(["powercfg", "-duplicatescheme", guid])
         match = re.search(r"GUID:\s*([0-9a-fA-F]{8}-[0-9a-fA-F-]+)", out2 or "")
         if match:
@@ -1154,11 +1523,367 @@ class WinExhaleApp(ctk.CTk):
                 self.log(self.t("log_pp_err"), "error")
         self.log(self.t("log_perf_restored" if restore else "log_perf_done"), "success")
 
+    # ---------------------------------------------------- tab: annoyances ---
+
+    def _build_annoyances_tab(self, tab):
+        ctk.CTkLabel(tab, text=self.t("annoyances_desc"), font=(FONT_FAMILY, 11),
+                     text_color=COL_TEXT_DIM, wraplength=940, justify="left",
+                     anchor="w").pack(anchor="w", padx=16, pady=(10, 4))
+
+        bar = ctk.CTkFrame(tab, fg_color="transparent")
+        bar.pack(fill="x", padx=16, pady=4)
+        btn_apply = ctk.CTkButton(bar, text=self.t("btn_apply_annoyances"), width=220, height=34,
+                                  corner_radius=8, font=(FONT_FAMILY, 12, "bold"),
+                                  fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
+                                  text_color=COL_ON_ACCENT, command=self.on_annoyances)
+        btn_apply.pack(side="right")
+        btn_restore = ctk.CTkButton(bar, text=self.t("btn_restore_annoyances"), width=180, height=34,
+                                    corner_radius=8, fg_color=COL_CARD_2,
+                                    hover_color=COL_ACCENT_DARK, text_color=COL_TEXT,
+                                    command=self.on_annoyances_restore)
+        btn_restore.pack(side="right", padx=8)
+        self._busy_widgets += [btn_apply, btn_restore]
+
+        scroll = ctk.CTkScrollableFrame(tab, fg_color=COL_CARD_2)
+        scroll.pack(fill="both", expand=True, padx=16, pady=(4, 12))
+
+        self._annoyance_vars = []
+        for item in ANNOYANCE_ITEMS:
+            row = ctk.CTkFrame(scroll, fg_color="transparent")
+            row.pack(fill="x", padx=10, pady=7)
+            texts = ctk.CTkFrame(row, fg_color="transparent")
+            texts.pack(side="left", fill="x", expand=True)
+            ctk.CTkLabel(texts, text=item["title"][self.lang],
+                         font=(FONT_FAMILY, 12, "bold"), text_color=COL_TEXT,
+                         anchor="w").pack(anchor="w")
+            ctk.CTkLabel(texts, text=item["desc"][self.lang], font=(FONT_FAMILY, 11),
+                         text_color=COL_TEXT_DIM, anchor="w", wraplength=680,
+                         justify="left").pack(anchor="w")
+            var = ctk.BooleanVar(value=True)
+            ctk.CTkSwitch(row, text="", variable=var, width=56,
+                          progress_color=COL_ACCENT).pack(side="right", padx=(10, 4))
+            self._annoyance_vars.append((item, var))
+
+    def on_annoyances(self):
+        selected = [(item, var) for item, var in self._annoyance_vars if var.get()]
+        if not selected:
+            self.log(self.t("log_none_selected"), "warn")
+            return
+        self._run_task(self._task_annoyances, selected, False)
+
+    def on_annoyances_restore(self):
+        selected = [(item, var) for item, var in self._annoyance_vars if var.get()]
+        if not selected:
+            self.log(self.t("log_none_selected"), "warn")
+            return
+        self._run_task(self._task_annoyances, selected, True)
+
+    def _task_annoyances(self, selected, restore):
+        key = "log_annoy_restore" if restore else "log_annoy_start"
+        self.log(self.t(key, n=len(selected)), "info")
+        for item, _var in selected:
+            regs = item["default_regs"] if restore else item["tweak_regs"]
+            for rkey, rval, rtype, rdata in regs:
+                rc, out = run_simple(["reg", "add", rkey, "/v", rval, "/t", rtype, "/d", rdata, "/f"])
+                if rc == 0:
+                    self.log(self.t("log_reg_ok", key=rkey, value=rval, data=rdata), "info")
+                else:
+                    err = (out or f"exit code {rc}").strip()
+                    self.log(self.t("log_reg_err", key=rkey, value=rval, err=err), "error")
+        done_key = "log_annoy_restored" if restore else "log_annoy_done"
+        self.log(self.t(done_key), "success")
+
+    # ----------------------------------------------------------- tab: DNS ---
+
+    def _build_dns_tab(self, tab):
+        ctk.CTkLabel(tab, text=self.t("dns_desc"), font=(FONT_FAMILY, 11),
+                     text_color=COL_TEXT_DIM, wraplength=940, justify="left",
+                     anchor="w").pack(anchor="w", padx=16, pady=(10, 4))
+
+        adapter_bar = ctk.CTkFrame(tab, fg_color=COL_CARD_2, corner_radius=8)
+        adapter_bar.pack(fill="x", padx=16, pady=4)
+        ctk.CTkLabel(adapter_bar, text=self.t("dns_adapter_label"),
+                     font=(FONT_FAMILY, 11, "bold"), text_color=COL_TEXT_DIM).pack(side="left", padx=(14, 6), pady=8)
+        self.dns_adapter_label = ctk.CTkLabel(adapter_bar, text=self.t("dns_adapter_detecting"),
+                                              font=(FONT_FAMILY, 11, "bold"), text_color=COL_ACCENT)
+        self.dns_adapter_label.pack(side="left", pady=8)
+
+        action_bar = ctk.CTkFrame(tab, fg_color="transparent")
+        action_bar.pack(fill="x", padx=16, pady=4)
+        btn_bench = ctk.CTkButton(action_bar, text=self.t("btn_benchmark_dns"), width=160, height=34,
+                                  corner_radius=8, fg_color=COL_CARD_2,
+                                  hover_color=COL_ACCENT_DARK, text_color=COL_TEXT,
+                                  command=self.on_benchmark_dns)
+        btn_bench.pack(side="left")
+
+        btn_apply = ctk.CTkButton(action_bar, text=self.t("btn_apply_dns"), width=200, height=34,
+                                  corner_radius=8, font=(FONT_FAMILY, 12, "bold"),
+                                  fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
+                                  text_color=COL_ON_ACCENT, command=self.on_apply_dns)
+        btn_apply.pack(side="right")
+
+        btn_reset = ctk.CTkButton(action_bar, text=self.t("btn_reset_dns"), width=190, height=34,
+                                  corner_radius=8, fg_color=COL_CARD_2,
+                                  hover_color=COL_ACCENT_DARK, text_color=COL_TEXT,
+                                  command=self.on_reset_dns)
+        btn_reset.pack(side="right", padx=8)
+        self._busy_widgets += [btn_bench, btn_apply, btn_reset]
+
+        scroll = ctk.CTkScrollableFrame(tab, fg_color=COL_CARD_2)
+        scroll.pack(fill="both", expand=True, padx=16, pady=(4, 12))
+
+        self._dns_radio_var = ctk.StringVar(value=DNS_SERVERS[0]["key"])
+        self._dns_latency_labels = {}
+
+        for srv in DNS_SERVERS:
+            card = ctk.CTkFrame(scroll, fg_color=COL_CARD, corner_radius=8)
+            card.pack(fill="x", padx=8, pady=4)
+
+            radio = ctk.CTkRadioButton(card, text="", variable=self._dns_radio_var,
+                                       value=srv["key"], width=24,
+                                       fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER)
+            radio.pack(side="left", padx=(12, 6), pady=12)
+
+            info = ctk.CTkFrame(card, fg_color="transparent")
+            info.pack(side="left", fill="x", expand=True, pady=8)
+
+            header_frame = ctk.CTkFrame(info, fg_color="transparent")
+            header_frame.pack(fill="x", anchor="w")
+            ctk.CTkLabel(header_frame, text=srv["name"], font=(FONT_FAMILY, 13, "bold"),
+                         text_color=COL_TEXT, anchor="w").pack(side="left")
+            ctk.CTkLabel(header_frame, text=f"({srv['primary']} / {srv['secondary']})",
+                         font=(FONT_FAMILY, 11), text_color=COL_ACCENT, anchor="w").pack(side="left", padx=8)
+
+            ctk.CTkLabel(info, text=srv["desc"][self.lang], font=(FONT_FAMILY, 11),
+                         text_color=COL_TEXT_DIM, anchor="w").pack(anchor="w")
+
+            lat_lbl = ctk.CTkLabel(card, text="— ms", font=(FONT_MONO, 12, "bold"),
+                                  text_color=COL_TEXT_DIM, width=100)
+            lat_lbl.pack(side="right", padx=14)
+            self._dns_latency_labels[srv["key"]] = lat_lbl
+
+        self.after(400, self._detect_dns_adapter)
+
+    def _detect_dns_adapter(self):
+        def worker():
+            adapter = get_active_network_adapter()
+            self._current_adapter = adapter
+            self._post(lambda: self.dns_adapter_label.configure(
+                text=adapter if adapter else self.t("dns_adapter_none"),
+                text_color=COL_SUCCESS if adapter else COL_WARN))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def on_benchmark_dns(self):
+        self._run_task(self._task_benchmark_dns)
+
+    def _task_benchmark_dns(self):
+        self.log(self.t("log_dns_bench_start"), "info")
+        results = {}
+
+        for srv in DNS_SERVERS:
+            lbl = self._dns_latency_labels.get(srv["key"])
+            if lbl:
+                self._post(lambda l=lbl: l.configure(text=self.t("dns_latency_measuring"), text_color=COL_TEXT_DIM))
+
+            lat = measure_dns_latency(srv["primary"], timeout=1.5, iterations=3)
+            results[srv["key"]] = lat
+
+            if lat is not None:
+                self.log(self.t("log_dns_bench_res", name=srv["name"], ip=srv["primary"], ms=f"{lat:.1f}"), "info")
+            else:
+                self.log(self.t("log_dns_bench_fail", name=srv["name"], ip=srv["primary"]), "warn")
+
+        # Find fastest valid latency
+        valid = {k: v for k, v in results.items() if v is not None}
+        fastest_key = min(valid, key=valid.get) if valid else None
+
+        for srv in DNS_SERVERS:
+            k = srv["key"]
+            lat = results.get(k)
+            lbl = self._dns_latency_labels.get(k)
+            if not lbl:
+                continue
+
+            if lat is None:
+                self._post(lambda l=lbl: l.configure(text="Timeout", text_color=COL_ERROR))
+            else:
+                is_fastest = (k == fastest_key)
+                text = f"{lat:.0f} ms" + (f" ({self.t('dns_fastest_badge')})" if is_fastest else "")
+                if lat < 20.0:
+                    color = COL_SUCCESS
+                elif lat < 50.0:
+                    color = COL_WARN
+                else:
+                    color = COL_ERROR
+                self._post(lambda l=lbl, t=text, c=color: l.configure(text=t, text_color=c))
+
+        if fastest_key and valid.get(fastest_key):
+            fastest_srv = next(s for s in DNS_SERVERS if s["key"] == fastest_key)
+            self._post(lambda k=fastest_key: self._dns_radio_var.set(k))
+            self.log(self.t("log_dns_bench_done", name=fastest_srv["name"], ms=f"{valid[fastest_key]:.1f}"), "success")
+
+    def on_apply_dns(self):
+        self._run_task(self._task_apply_dns)
+
+    def _task_apply_dns(self):
+        adapter = get_active_network_adapter()
+        if not adapter:
+            self.log(self.t("log_dns_no_adapter"), "error")
+            return
+
+        selected_key = self._dns_radio_var.get()
+        srv = next((s for s in DNS_SERVERS if s["key"] == selected_key), DNS_SERVERS[0])
+
+        self.log(self.t("log_dns_applying", adapter=adapter, name=srv["name"], p=srv["primary"], s=srv["secondary"]), "info")
+        ps_cmd = (
+            f"Set-DnsClientServerAddress -InterfaceAlias '{adapter}' "
+            f"-ServerAddresses @('{srv['primary']}', '{srv['secondary']}') -ErrorAction Stop"
+        )
+        rc, out = run_powershell(ps_cmd, timeout=30)
+        if rc == 0:
+            run_simple(["ipconfig", "/flushdns"], timeout=10)
+            self.log(self.t("log_dns_applied"), "success")
+        else:
+            self.log(self.t("log_dns_err", err=out.strip()), "error")
+
+    def on_reset_dns(self):
+        self._run_task(self._task_reset_dns)
+
+    def _task_reset_dns(self):
+        adapter = get_active_network_adapter()
+        if not adapter:
+            self.log(self.t("log_dns_no_adapter"), "error")
+            return
+
+        self.log(self.t("log_dns_resetting", adapter=adapter), "info")
+        ps_cmd = f"Set-DnsClientServerAddress -InterfaceAlias '{adapter}' -ResetServerAddresses -ErrorAction Stop"
+        rc, out = run_powershell(ps_cmd, timeout=30)
+        if rc == 0:
+            run_simple(["ipconfig", "/flushdns"], timeout=10)
+            self.log(self.t("log_dns_reset"), "success")
+        else:
+            self.log(self.t("log_dns_err", err=out.strip()), "error")
+
+    # ------------------------------------------------- tab: App Installer ---
+
+    def _build_apps_tab(self, tab):
+        ctk.CTkLabel(tab, text=self.t("apps_desc"), font=(FONT_FAMILY, 11),
+                     text_color=COL_TEXT_DIM, wraplength=940, justify="left",
+                     anchor="w").pack(anchor="w", padx=16, pady=(10, 4))
+
+        bar = ctk.CTkFrame(tab, fg_color="transparent")
+        bar.pack(fill="x", padx=16, pady=4)
+        ctk.CTkButton(bar, text=self.t("btn_select_all"), width=130, height=30, corner_radius=6,
+                      fg_color=COL_CARD_2, hover_color=COL_ACCENT_DARK, text_color=COL_TEXT,
+                      command=self._select_all_apps).pack(side="left")
+        ctk.CTkButton(bar, text=self.t("btn_deselect_all"), width=130, height=30, corner_radius=6,
+                      fg_color=COL_CARD_2, hover_color=COL_ACCENT_DARK, text_color=COL_TEXT,
+                      command=self._deselect_all_apps).pack(side="left", padx=8)
+        btn = ctk.CTkButton(bar, text=self.t("btn_install_apps"), width=240, height=34,
+                            corner_radius=8, font=(FONT_FAMILY, 12, "bold"),
+                            fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
+                            text_color=COL_ON_ACCENT, command=self.on_install_apps)
+        btn.pack(side="right")
+        self._busy_widgets.append(btn)
+
+        scroll = ctk.CTkScrollableFrame(tab, fg_color=COL_CARD_2)
+        scroll.pack(fill="both", expand=True, padx=16, pady=(4, 12))
+
+        self._app_vars = []
+        for cat in APP_PACKAGES:
+            cat_header = ctk.CTkFrame(scroll, fg_color="transparent")
+            cat_header.pack(fill="x", padx=8, pady=(10, 2))
+            ctk.CTkLabel(cat_header, text=self.t(cat["category"]), font=(FONT_FAMILY, 12, "bold"),
+                         text_color=COL_ACCENT).pack(anchor="w")
+
+            for app in cat["apps"]:
+                row = ctk.CTkFrame(scroll, fg_color=COL_CARD, corner_radius=6)
+                row.pack(fill="x", padx=8, pady=3)
+
+                var = ctk.BooleanVar(value=False)
+                cb = ctk.CTkCheckBox(row, text="", variable=var, width=24,
+                                     fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
+                                     checkmark_color=COL_ON_ACCENT)
+                cb.pack(side="left", padx=(10, 6), pady=8)
+
+                texts = ctk.CTkFrame(row, fg_color="transparent")
+                texts.pack(side="left", fill="x", expand=True, pady=6)
+                ctk.CTkLabel(texts, text=app["name"], font=(FONT_FAMILY, 12, "bold"),
+                             text_color=COL_TEXT, anchor="w").pack(anchor="w")
+                ctk.CTkLabel(texts, text=f"{app['desc']}  •  [{app['id']}]",
+                             font=(FONT_FAMILY, 10), text_color=COL_TEXT_DIM, anchor="w").pack(anchor="w")
+
+                self._app_vars.append((app, var))
+
+    def _select_all_apps(self):
+        for _app, var in self._app_vars:
+            var.set(True)
+
+    def _deselect_all_apps(self):
+        for _app, var in self._app_vars:
+            var.set(False)
+
+    def on_install_apps(self):
+        selected = [app for app, var in self._app_vars if var.get()]
+        if not selected:
+            self.log(self.t("log_none_selected"), "warn")
+            return
+        self._run_task(self._task_install_apps, selected)
+
+    def _task_install_apps(self, selected):
+        winget_path = shutil.which("winget")
+        if not winget_path:
+            rc, _ = run_simple(["winget", "--version"], timeout=5)
+            if rc != 0:
+                self.log(self.t("log_winget_missing"), "error")
+                return
+
+        self.log(self.t("log_apps_start", n=len(selected)), "info")
+        for app in selected:
+            name = app["name"]
+            pkg_id = app["id"]
+            self.log(self.t("log_app_start", name=name, id=pkg_id), "info")
+
+            cmd = [
+                "winget", "install",
+                "--id", pkg_id,
+                "--exact",
+                "--silent",
+                "--accept-package-agreements",
+                "--accept-source-agreements"
+            ]
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    creationflags=CREATE_NO_WINDOW
+                )
+                if proc.stdout:
+                    for line in iter(proc.stdout.readline, ""):
+                        if not line:
+                            break
+                        clean = line.strip()
+                        if clean:
+                            self.log(f"  [{name}] {clean}", "raw")
+                    proc.stdout.close()
+                rc = proc.wait(timeout=600)
+                if rc == 0:
+                    self.log(self.t("log_app_ok", name=name), "success")
+                else:
+                    self.log(self.t("log_app_warn", rc=rc, name=name), "warn")
+            except Exception as exc:
+                self.log(f"  [{name}] Error: {exc}", "error")
+
+        self.log(self.t("log_apps_done"), "success")
+
     # --------------------------------------------------------- tab: clean ---
 
     def _build_clean_tab(self, tab):
         ctk.CTkLabel(tab, text=self.t("clean_desc"), font=(FONT_FAMILY, 11),
-                     text_color=COL_TEXT_DIM, wraplength=900, justify="left",
+                     text_color=COL_TEXT_DIM, wraplength=940, justify="left",
                      anchor="w").pack(anchor="w", padx=16, pady=(10, 4))
 
         body = ctk.CTkFrame(tab, fg_color=COL_CARD_2)
@@ -1244,7 +1969,7 @@ class WinExhaleApp(ctk.CTk):
 
     def _build_startup_tab(self, tab):
         ctk.CTkLabel(tab, text=self.t("startup_desc"), font=(FONT_FAMILY, 11),
-                     text_color=COL_TEXT_DIM, wraplength=900, justify="left",
+                     text_color=COL_TEXT_DIM, wraplength=940, justify="left",
                      anchor="w").pack(anchor="w", padx=16, pady=(10, 4))
 
         bar = ctk.CTkFrame(tab, fg_color="transparent")
@@ -1264,7 +1989,7 @@ class WinExhaleApp(ctk.CTk):
         self.startup_scroll.pack(fill="both", expand=True, padx=16, pady=(4, 12))
         self._startup_switches = []
         self._populate_startup_rows([])
-        self.after(300, self.on_startup_refresh)          # initial scan
+        self.after(300, self.on_startup_refresh)
 
     def _populate_startup_rows(self, items):
         for widget in self.startup_scroll.winfo_children():
@@ -1282,7 +2007,7 @@ class WinExhaleApp(ctk.CTk):
                          text_color=COL_TEXT if not item["disabled"] else COL_TEXT_DIM,
                          anchor="w").pack(anchor="w")
             ctk.CTkLabel(texts, text=item["command"], font=(FONT_FAMILY, 10),
-                         text_color=COL_TEXT_DIM, anchor="w", wraplength=620,
+                         text_color=COL_TEXT_DIM, anchor="w", wraplength=640,
                          justify="left").pack(anchor="w")
             var = ctk.BooleanVar(value=not item["disabled"])
             switch = ctk.CTkSwitch(row, text="", variable=var, width=56,
@@ -1349,7 +2074,7 @@ def main():
 
     if not is_admin():
         if relaunch_elevated():
-            sys.exit(0)                      # elevated copy now starting
+            sys.exit(0)
         ctypes.windll.user32.MessageBoxW(
             0,
             "WinExhale requires administrator privileges.\n\n"

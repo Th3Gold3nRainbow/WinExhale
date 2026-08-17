@@ -49,17 +49,33 @@ Built with Python and a sleek dark CustomTkinter interface, WinExhale gives powe
 - 🏎️ **Service Streamlining**: Toggle SysMain (Superfetch) and indexing services for responsiveness on SSDs/NVMe drives.
 - 🔄 **One-Click Restore**: Easily revert to Windows default performance profiles at any time.
 
-### 📋 4. Safe Startup Manager
+### 🛡️ 4. Windows Annoyances (QoL Tweaks)
+- 🚫 **Disable Sticky Keys Prompt**: Permanently disables the intrusive Shift 5x popup in games (`Flags = 506`).
+- 🔎 **Start Menu Web Search Stripper**: Stops Windows Search from querying Bing servers.
+- 🔕 **Lock Screen Ads & Tips**: Cleans up lock screen sponsored banners and notifications.
+- 📰 **Taskbar Widgets & News Ticker**: Disables intrusive Windows 11/10 news widgets.
+- 📁 **Show File Extensions & Hidden Files**: Automatically enables full file extensions and hidden items in File Explorer.
+
+### 🌐 5. DNS Optimizer & Live Latency Benchmark
+- ⏱️ **Live Resolver Benchmarking**: Pings top DNS providers (Cloudflare, Google, Quad9, AdGuard) with real-time color badges (Green < 20ms, Yellow < 50ms, Red > 50ms).
+- 🔄 **Dynamic Adapter Switching**: Identifies active network interfaces and applies optimal DNS settings via PowerShell.
+- 🔁 **DHCP One-Click Reset**: Instant rollback to automatic DNS with automatic resolver cache flush (`ipconfig /flushdns`).
+
+### 📦 6. App Installer (Winget Integration)
+- 🚀 **One-Click Multi-App Deployment**: Install essential software seamlessly across 5 categories (Browsers, Utilities, Media, Gaming, Dev Tools).
+- 📜 **Live Terminal Output**: Streams real-time download and installation progress directly into the in-app console.
+
+### 📋 7. Safe Startup Manager
 - 🔍 **Unified Registry & Folder Scanner**: Inspects `HKCU`/`HKLM` run keys and user startup directories.
 - 🛡️ **Non-Destructive Toggle**: Disabling an item preserves the full path in registry backups (`Run\WinExhale_Disabled`) and file backups in `%APPDATA%\WinExhale\StartupBackup`. Toggling back immediately restores the exact original entry.
 
-### 🧹 5. Deep Junk & Cache Cleaner
+### 🧹 8. Deep Junk & Cache Cleaner
 - 💾 **System Temp Cleanup**: Purges locked and stale `%TEMP%`, `C:\Windows\Temp`, and log dumps.
 - 🌐 **DNS & Network Flush**: Clears local resolver caches to resolve connectivity hiccups.
 - 🎮 **Shader & GPU Cache Refresh**: Flushes obsolete DirectX/GPU shader caches for stutter-free gaming.
 - 📊 **Real-Time Savings Counter**: Displays exact freed disk space live.
 
-### 🌐 6. Bilingual & Modern UI
+### 🌐 9. Bilingual & Modern UI
 - 🎨 **Sleek Cyber-Dark Theme**: Native dark theme with vibrant cyan accents.
 - 🌍 **Full Localization**: Seamless toggle between **English** and **Français** with instant UI refresh.
 - 📜 **Live Threaded Console**: Timestamped, color-coded execution output that never freezes the main interface.
