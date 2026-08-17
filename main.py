@@ -50,7 +50,7 @@ if getattr(sys, "frozen", False):
             setattr(sys, _name, open(os.devnull, "w"))
 
 APP_NAME = "WinExhale"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.2"
 
 # ---------------------------------------------------------------- palette ---
 COL_BG = "#0B1220"
