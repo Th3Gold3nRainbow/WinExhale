@@ -85,7 +85,7 @@ Built with Python and a sleek dark CustomTkinter interface, WinExhale gives powe
 ## 📸 Preview / Interface
 
 <div align="center">
-  <img src="app_logo.png" alt="WinExhale UI Preview" width="700" style="border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);">
+  <img src="ui_preview.png" alt="WinExhale UI Preview" width="850" style="border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);">
   <p><em>Modern, responsive CustomTkinter UI with real-time logging and instant actions.</em></p>
 </div>
 
