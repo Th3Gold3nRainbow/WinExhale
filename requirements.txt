@@ -1,0 +1,7 @@
+# Core GUI & Engine
+customtkinter>=5.2.2
+pillow>=10.2.0
+pywin32>=306
+
+# Packaging & Build
+pyinstaller>=6.4.0

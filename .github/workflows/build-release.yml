@@ -1,0 +1,89 @@
+name: Build & Release WinExhale
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag (e.g., v1.1.0)"
+        required: false
+        default: "v1.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Standalone EXE & Setup Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate Application Icons & Assets
+        run: |
+          python generate_assets.py
+
+      - name: Build Standalone Executable (PyInstaller)
+        run: |
+          pyinstaller WinExhale.spec --noconfirm --clean
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup --no-progress
+
+      - name: Compile Setup Installer (Inno Setup)
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Verify Build Artifacts
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist\WinExhale.exe")) {
+            throw "Error: dist\WinExhale.exe was not created!"
+          }
+          if (-not (Test-Path "installer_output\WinExhale_Setup.exe")) {
+            throw "Error: installer_output\WinExhale_Setup.exe was not created!"
+          }
+          Write-Host "All release binaries successfully built!"
+          Get-ChildItem -Path dist, installer_output -Filter *.exe | Select-Object Name, Length
+
+      - name: Upload Artifacts (Action Run)
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinExhale-Binaries
+          path: |
+            dist/WinExhale.exe
+            installer_output/WinExhale_Setup.exe
+          if-no-files-found: error
+
+      - name: Create GitHub Release & Upload Assets
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: ${{ github.ref_name || github.event.inputs.tag_name }}
+          name: WinExhale ${{ github.ref_name || github.event.inputs.tag_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            dist/WinExhale.exe
+            installer_output/WinExhale_Setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
