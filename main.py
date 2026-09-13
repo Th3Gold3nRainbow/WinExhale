@@ -50,7 +50,7 @@ if getattr(sys, "frozen", False):
             setattr(sys, _name, open(os.devnull, "w"))
 
 APP_NAME = "WinExhale"
-APP_VERSION = "1.2.7"
+APP_VERSION = "1.2.8"
 
 # ---------------------------------------------------------------- palette ---
 COL_BG = "#0B1220"
@@ -224,6 +224,22 @@ TRANSLATIONS = {
         "tab_startup": "Startup",
         "tab_clean": "Junk Cleaner",
 
+        # Widgets
+        "btn_detach_widget": "Detach widget",
+        "widget_junk_title": "Junk Cleaner",
+        "widget_dns_title": "DNS Optimizer",
+        "widget_scan": "Scan",
+        "widget_clean": "Clean",
+        "widget_retest": "Retest",
+        "widget_apply": "Apply Best",
+        "widget_reset": "Reset (DHCP)",
+        "widget_analyzing": "Scanning...",
+        "widget_complete": "Complete",
+        "widget_freed": "Freed: {size}",
+        "widget_timeout": "Timeout",
+        "widget_applied": "Applied {name} on {adapter}",
+        "widget_reset_done": "Reset {adapter} to DHCP",
+
         # Common buttons
         "btn_select_all": "Select all",
         "btn_deselect_all": "Deselect all",
@@ -381,6 +397,22 @@ TRANSLATIONS = {
         "tab_apps": "Installateur d'apps",
         "tab_startup": "Démarrage",
         "tab_clean": "Nettoyage",
+
+        # Widgets
+        "btn_detach_widget": "Détacher le widget",
+        "widget_junk_title": "Nettoyeur de Fichiers",
+        "widget_dns_title": "Optimiseur DNS",
+        "widget_scan": "Scanner",
+        "widget_clean": "Nettoyer",
+        "widget_retest": "Retester",
+        "widget_apply": "Appliquer le meilleur",
+        "widget_reset": "Réinitialiser (DHCP)",
+        "widget_analyzing": "Analyse...",
+        "widget_complete": "Terminé",
+        "widget_freed": "Libéré : {size}",
+        "widget_timeout": "Délai dépassé",
+        "widget_applied": "DNS {name} appliqué sur {adapter}",
+        "widget_reset_done": "Réseau {adapter} rétabli en DHCP",
 
         # Common buttons
         "btn_select_all": "Tout sélectionner",
@@ -1026,44 +1058,43 @@ def set_dark_titlebar(window):
 # ----------------------------------------------------------- Widgets ----
 
 class JunkCleanerWidget(ctk.CTkToplevel):
-    def __init__(self, app_ref):
-        super().__init__()
-        self.app = app_ref
-        self.title("WinExhale · Junk Cleaner")
+    def __init__(self, master=None):
+        super().__init__(master=master)
+        self.app = master
+        self.title(self.app.t("widget_junk_title"))
         self.geometry("300x220+80+80")
         self.overrideredirect(True)
         self.attributes("-topmost", True)
         self.configure(fg_color=COL_BG)
 
-        self._drag_x = 0
-        self._drag_y = 0
         self.junk_bytes = 0
         self.freed_bytes = 0
-        
-        self.is_dragging = False
+
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._build_ui()
+        
+        self.update_idletasks()
+        self.deiconify()
+        self.lift()
+        
         self._scan_async()
 
     def _build_ui(self):
         header = ctk.CTkFrame(self, fg_color=COL_CARD, height=32, corner_radius=0)
         header.pack(fill="x")
         header.bind("<ButtonPress-1>", self._start_move)
-        header.bind("<B1-Motion>", self._do_move)
-        header.bind("<ButtonRelease-1>", self._stop_move)
 
         title_lbl = ctk.CTkLabel(
-            header, text="🧹 Junk Cleaner", text_color=COL_ACCENT,
+            header, text="🧹 " + self.app.t("widget_junk_title"), text_color=COL_ACCENT,
             font=(FONT_FAMILY, 13, "bold")
         )
         title_lbl.pack(side="left", padx=10)
         title_lbl.bind("<ButtonPress-1>", self._start_move)
-        title_lbl.bind("<B1-Motion>", self._do_move)
-        title_lbl.bind("<ButtonRelease-1>", self._stop_move)
 
         close_btn = ctk.CTkButton(
             header, text="✕", width=24, height=24, fg_color="transparent",
-            hover_color=COL_DANGER, text_color=COL_TEXT_DIM, command=self.destroy
+            hover_color=COL_DANGER, text_color=COL_TEXT_DIM, command=self._on_close
         )
         close_btn.pack(side="right", padx=4)
 
@@ -1071,12 +1102,12 @@ class JunkCleanerWidget(ctk.CTkToplevel):
         body.pack(fill="both", expand=True, padx=14, pady=12)
 
         self.status_lbl = ctk.CTkLabel(
-            body, text="Analyse...", text_color=COL_TEXT_DIM, font=(FONT_FAMILY, 12)
+            body, text=self.app.t("widget_analyzing"), text_color=COL_TEXT_DIM, font=(FONT_FAMILY, 12)
         )
         self.status_lbl.pack(anchor="w")
 
         self.junk_size_lbl = ctk.CTkLabel(
-            body, text="-- Mo", text_color=COL_TEXT, font=(FONT_FAMILY, 26, "bold")
+            body, text="--", text_color=COL_TEXT, font=(FONT_FAMILY, 26, "bold")
         )
         self.junk_size_lbl.pack(anchor="w", pady=(2, 8))
 
@@ -1085,7 +1116,7 @@ class JunkCleanerWidget(ctk.CTkToplevel):
         self.progress.pack(fill="x", pady=(0, 10))
 
         self.freed_lbl = ctk.CTkLabel(
-            body, text="Libéré : 0 Mo" if self.app.lang == "fr" else "Freed: 0 MB", text_color=COL_SUCCESS, font=(FONT_FAMILY, 12)
+            body, text=self.app.t("widget_freed", size="0 B"), text_color=COL_SUCCESS, font=(FONT_FAMILY, 12)
         )
         self.freed_lbl.pack(anchor="w")
 
@@ -1093,32 +1124,29 @@ class JunkCleanerWidget(ctk.CTkToplevel):
         btn_row.pack(fill="x", pady=(10, 0))
 
         self.scan_btn = ctk.CTkButton(
-            btn_row, text="🔍 Scanner" if self.app.lang == "fr" else "🔍 Scan", fg_color="transparent", border_width=1,
+            btn_row, text="🔍 " + self.app.t("widget_scan"), fg_color="transparent", border_width=1,
             border_color=COL_ACCENT, text_color=COL_ACCENT, hover_color=COL_CARD,
             command=self._scan_async
         )
         self.scan_btn.pack(side="left", expand=True, fill="x", padx=(0, 6))
 
         self.clean_btn = ctk.CTkButton(
-            btn_row, text="🧹 Nettoyer" if self.app.lang == "fr" else "🧹 Clean", fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
+            btn_row, text="🧹 " + self.app.t("widget_clean"), fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
             text_color=COL_ON_ACCENT, command=self._clean_async
         )
         self.clean_btn.pack(side="left", expand=True, fill="x")
 
     def _start_move(self, event):
-        self.is_dragging = True
-        self._drag_x, self._drag_y = event.x, event.y
+        ctypes.windll.user32.ReleaseCapture()
+        ctypes.windll.user32.SendMessageW(self.winfo_id(), 0x0112, 0xF012, 0)
 
-    def _do_move(self, event):
-        x = event.x_root - self._drag_x
-        y = event.y_root - self._drag_y
-        self.geometry(f"+{x}+{y}")
-        
-    def _stop_move(self, event):
-        self.is_dragging = False
+    def _on_close(self):
+        if self.app:
+            self.app.junk_widget_window = None
+        self.destroy()
 
     def _scan_async(self):
-        self.status_lbl.configure(text="Analyse..." if self.app.lang == "fr" else "Scanning...")
+        self.status_lbl.configure(text=self.app.t("widget_analyzing"))
         self.scan_btn.configure(state="disabled")
         threading.Thread(target=self._scan_worker, daemon=True).start()
 
@@ -1138,11 +1166,8 @@ class JunkCleanerWidget(ctk.CTkToplevel):
         self.after(0, self._update_scan_ui)
 
     def _update_scan_ui(self):
-        if self.is_dragging:
-            self.after(100, self._update_scan_ui)
-            return
         self.junk_size_lbl.configure(text=fmt_bytes(self.junk_bytes))
-        self.status_lbl.configure(text="Terminé" if self.app.lang == "fr" else "Complete")
+        self.status_lbl.configure(text=self.app.t("widget_complete"))
         self.progress.set(1.0 if self.junk_bytes > 0 else 0)
         self.scan_btn.configure(state="normal")
 
@@ -1162,52 +1187,49 @@ class JunkCleanerWidget(ctk.CTkToplevel):
         self.after(0, self._update_clean_ui)
 
     def _update_clean_ui(self):
-        if self.is_dragging:
-            self.after(100, self._update_clean_ui)
-            return
-        txt = "Libéré : " if self.app.lang == "fr" else "Freed: "
-        self.freed_lbl.configure(text=f"{txt}{fmt_bytes(self.freed_bytes)}")
+        self.freed_lbl.configure(text=self.app.t("widget_freed", size=fmt_bytes(self.freed_bytes)))
         self.clean_btn.configure(state="normal")
         self._scan_async()
 
+
 class DNSOptimizerWidget(ctk.CTkToplevel):
-    def __init__(self, app_ref):
-        super().__init__()
-        self.app = app_ref
-        self.title("WinExhale · DNS Optimizer")
+    def __init__(self, master=None):
+        super().__init__(master=master)
+        self.app = master
+        self.title(self.app.t("widget_dns_title"))
         self.geometry("300x300+420+80")
         self.overrideredirect(True)
         self.attributes("-topmost", True)
         self.configure(fg_color=COL_BG)
 
-        self._drag_x = 0
-        self._drag_y = 0
         self.results = {}
         self.row_widgets = {}
-        self.is_dragging = False
+
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._build_ui()
+        
+        self.update_idletasks()
+        self.deiconify()
+        self.lift()
+        
         self._refresh_async()
 
     def _build_ui(self):
         header = ctk.CTkFrame(self, fg_color=COL_CARD, height=32, corner_radius=0)
         header.pack(fill="x")
         header.bind("<ButtonPress-1>", self._start_move)
-        header.bind("<B1-Motion>", self._do_move)
-        header.bind("<ButtonRelease-1>", self._stop_move)
 
         title_lbl = ctk.CTkLabel(
-            header, text="🌐 DNS Optimizer", text_color=COL_ACCENT,
+            header, text="🌐 " + self.app.t("widget_dns_title"), text_color=COL_ACCENT,
             font=(FONT_FAMILY, 13, "bold")
         )
         title_lbl.pack(side="left", padx=10)
         title_lbl.bind("<ButtonPress-1>", self._start_move)
-        title_lbl.bind("<B1-Motion>", self._do_move)
-        title_lbl.bind("<ButtonRelease-1>", self._stop_move)
 
         close_btn = ctk.CTkButton(
             header, text="✕", width=24, height=24, fg_color="transparent",
-            hover_color=COL_DANGER, text_color=COL_TEXT_DIM, command=self.destroy
+            hover_color=COL_DANGER, text_color=COL_TEXT_DIM, command=self._on_close
         )
         close_btn.pack(side="right", padx=4)
 
@@ -1243,20 +1265,20 @@ class DNSOptimizerWidget(ctk.CTkToplevel):
         btn_row.pack(fill="x", pady=(10, 0))
 
         self.refresh_btn = ctk.CTkButton(
-            btn_row, text="🔄 Retester" if self.app.lang == "fr" else "🔄 Retest", fg_color="transparent", border_width=1,
+            btn_row, text="🔄 " + self.app.t("widget_retest"), fg_color="transparent", border_width=1,
             border_color=COL_ACCENT, text_color=COL_ACCENT, hover_color=COL_CARD,
             command=self._refresh_async
         )
         self.refresh_btn.pack(side="left", expand=True, fill="x", padx=(0, 6))
 
         self.apply_btn = ctk.CTkButton(
-            btn_row, text="⚡ Appliquer" if self.app.lang == "fr" else "⚡ Apply Best", fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
+            btn_row, text="⚡ " + self.app.t("widget_apply"), fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
             text_color=COL_ON_ACCENT, command=self._apply_best_async
         )
         self.apply_btn.pack(side="left", expand=True, fill="x")
 
         self.reset_btn = ctk.CTkButton(
-            body, text="↩ Réinitialiser (DHCP)" if self.app.lang == "fr" else "↩ Reset (DHCP)", fg_color="transparent",
+            body, text="↩ " + self.app.t("widget_reset"), fg_color="transparent",
             text_color=COL_TEXT_DIM, hover_color=COL_CARD, command=self._reset_async
         )
         self.reset_btn.pack(fill="x", pady=(8, 0))
@@ -1267,16 +1289,13 @@ class DNSOptimizerWidget(ctk.CTkToplevel):
         self.status_lbl.pack(anchor="w", pady=(6, 0))
 
     def _start_move(self, event):
-        self.is_dragging = True
-        self._drag_x, self._drag_y = event.x, event.y
+        ctypes.windll.user32.ReleaseCapture()
+        ctypes.windll.user32.SendMessageW(self.winfo_id(), 0x0112, 0xF012, 0)
 
-    def _do_move(self, event):
-        x = event.x_root - self._drag_x
-        y = event.y_root - self._drag_y
-        self.geometry(f"+{x}+{y}")
-        
-    def _stop_move(self, event):
-        self.is_dragging = False
+    def _on_close(self):
+        if self.app:
+            self.app.dns_widget_window = None
+        self.destroy()
 
     def _badge_color(self, ms):
         if ms is None: return COL_DANGER
@@ -1298,13 +1317,17 @@ class DNSOptimizerWidget(ctk.CTkToplevel):
         self.after(0, lambda: self.refresh_btn.configure(state="normal"))
 
     def _update_row(self, name, ms):
-        if self.is_dragging:
-            self.after(100, self._update_row, name, ms)
-            return
         lbl = self.row_widgets[name]
         color = self._badge_color(ms)
-        text = f"{ms:.1f} ms" if ms is not None else "Timeout"
+        text = f"{ms:.1f} ms" if ms is not None else self.app.t("widget_timeout")
         lbl.configure(text=text, text_color=color)
+
+    def _get_active_adapter(self):
+        cmd = "Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and $_.InterfaceIndex -eq (Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Sort-Object RouteMetric | Select-Object -First 1).InterfaceIndex } | Select-Object -ExpandProperty Name"
+        rc, out = run_powershell(cmd)
+        if rc == 0 and out.strip():
+            return out.strip().split("\n")[0]
+        return "Ethernet"
 
     def _apply_best_async(self):
         valid = {k: v for k, v in self.results.items() if v is not None}
@@ -1313,32 +1336,28 @@ class DNSOptimizerWidget(ctk.CTkToplevel):
         srv = next(p for p in DNS_SERVERS if p["name"] == best_name)
         
         self.apply_btn.configure(state="disabled")
-        adapter = self.app.dns_adapter_label.cget("text")
-        if not adapter or adapter == self.app.t("dns_adapter_detecting"):
-            adapter = "Ethernet"
-            
+        
         def _apply():
+            adapter = self._get_active_adapter()
             rc, _ = run_powershell(f'netsh interface ip set dns name="{adapter}" static {srv["primary"]} primary')
             if srv["secondary"]:
                 run_powershell(f'netsh interface ip add dns name="{adapter}" {srv["secondary"]} index=2')
             run_powershell("ipconfig /flushdns")
             self.after(0, lambda: (
-                self.status_lbl.configure(text=f"Applied {best_name} on {adapter}", text_color=COL_SUCCESS),
+                self.status_lbl.configure(text=self.app.t("widget_applied", name=best_name, adapter=adapter), text_color=COL_SUCCESS),
                 self.apply_btn.configure(state="normal")
             ))
         threading.Thread(target=_apply, daemon=True).start()
 
     def _reset_async(self):
         self.reset_btn.configure(state="disabled")
-        adapter = self.app.dns_adapter_label.cget("text")
-        if not adapter or adapter == self.app.t("dns_adapter_detecting"):
-            adapter = "Ethernet"
-            
+        
         def _reset():
+            adapter = self._get_active_adapter()
             run_powershell(f'netsh interface ip set dns name="{adapter}" dhcp')
             run_powershell("ipconfig /flushdns")
             self.after(0, lambda: (
-                self.status_lbl.configure(text=f"Reset {adapter} to DHCP", text_color=COL_SUCCESS),
+                self.status_lbl.configure(text=self.app.t("widget_reset_done", adapter=adapter), text_color=COL_SUCCESS),
                 self.reset_btn.configure(state="normal")
             ))
         threading.Thread(target=_reset, daemon=True).start()
@@ -1372,9 +1391,25 @@ class WinExhaleApp(ctk.CTk):
         self._log_queue = queue.Queue()
         self.header = None
         self.tab_area = None
+        self.junk_widget_window = None
+        self.dns_widget_window = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
+
+    def open_junk_widget(self):
+        if self.junk_widget_window is None or not self.junk_widget_window.winfo_exists():
+            self.junk_widget_window = JunkCleanerWidget(master=self)
+        else:
+            self.junk_widget_window.lift()
+            self.junk_widget_window.focus()
+
+    def open_dns_widget(self):
+        if self.dns_widget_window is None or not self.dns_widget_window.winfo_exists():
+            self.dns_widget_window = DNSOptimizerWidget(master=self)
+        else:
+            self.dns_widget_window.lift()
+            self.dns_widget_window.focus()
 
         self._build_console()
         self.after(100, self._poll_log_queue)
@@ -1995,10 +2030,10 @@ class WinExhaleApp(ctk.CTk):
                                   command=self.on_benchmark_dns)
         btn_bench.pack(side="left")
 
-        btn_widget = ctk.CTkButton(action_bar, text="Détacher en widget", width=140, height=34,
+        btn_widget = ctk.CTkButton(action_bar, text=self.t("btn_detach_widget"), width=140, height=34,
                                    corner_radius=8, fg_color="transparent", border_width=1,
                                    border_color=COL_ACCENT_DARK, text_color=COL_ACCENT,
-                                   hover_color=COL_CARD_2, command=lambda: DNSOptimizerWidget(self))
+                                   hover_color=COL_CARD_2, command=self.open_dns_widget)
         btn_widget.pack(side="left", padx=10)
 
         btn_apply = ctk.CTkButton(action_bar, text=self.t("btn_apply_dns"), width=200, height=34,
@@ -2299,11 +2334,11 @@ class WinExhaleApp(ctk.CTk):
                             text_color=COL_ON_ACCENT, command=self.on_clean)
         btn.pack(side="right")
         
-        btn_widget = ctk.CTkButton(bar, text="Détacher en widget", width=160, height=36,
+        btn_widget = ctk.CTkButton(bar, text=self.t("btn_detach_widget"), width=160, height=36,
                                    corner_radius=8, font=(FONT_FAMILY, 12, "bold"),
                                    fg_color="transparent", border_width=1, border_color=COL_ACCENT_DARK,
                                    text_color=COL_ACCENT, hover_color=COL_CARD_2,
-                                   command=lambda: JunkCleanerWidget(self))
+                                   command=self.open_junk_widget)
         btn_widget.pack(side="right", padx=14)
         
         self._busy_widgets.append(btn)
