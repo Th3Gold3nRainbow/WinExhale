@@ -50,7 +50,7 @@ if getattr(sys, "frozen", False):
             setattr(sys, _name, open(os.devnull, "w"))
 
 APP_NAME = "WinExhale"
-APP_VERSION = "1.2.2"
+APP_VERSION = "1.2.4"
 
 # ---------------------------------------------------------------- palette ---
 COL_BG = "#0B1220"
@@ -1555,10 +1555,22 @@ class WinExhaleApp(ctk.CTk):
     def _task_perf(self, keys, restore):
         self.log(self.t("log_perf_restore" if restore else "log_perf_start"), "info")
         if "sysmain" in keys:
-            _rc, out = run_powershell(ps_service("SysMain", disable=not restore))
+            if restore:
+                _rc, out = run_powershell('Set-Service -Name "SysMain" -StartupType Automatic; Start-Service -Name "SysMain"')
+                for key, var in self._perf_vars:
+                    if key == "sysmain":
+                        self.after(0, lambda v=var: v.set(False))
+            else:
+                _rc, out = run_powershell(ps_service("SysMain", disable=True))
             self._log_service_output(out)
         if "wsearch" in keys:
-            _rc, out = run_powershell(ps_service("WSearch", disable=not restore))
+            if restore:
+                _rc, out = run_powershell('Set-Service -Name "WSearch" -StartupType Automatic; Start-Service -Name "WSearch"')
+                for key, var in self._perf_vars:
+                    if key == "wsearch":
+                        self.after(0, lambda v=var: v.set(False))
+            else:
+                _rc, out = run_powershell(ps_service("WSearch", disable=True))
             self._log_service_output(out)
         if "power" in keys:
             guid = BALANCED_GUID if restore else HIGH_PERF_GUID
