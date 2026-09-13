@@ -50,7 +50,7 @@ if getattr(sys, "frozen", False):
             setattr(sys, _name, open(os.devnull, "w"))
 
 APP_NAME = "WinExhale"
-APP_VERSION = "1.2.6"
+APP_VERSION = "1.2.7"
 
 # ---------------------------------------------------------------- palette ---
 COL_BG = "#0B1220"
@@ -1023,6 +1023,326 @@ def set_dark_titlebar(window):
     except Exception:
         pass
 
+# ----------------------------------------------------------- Widgets ----
+
+class JunkCleanerWidget(ctk.CTkToplevel):
+    def __init__(self, app_ref):
+        super().__init__()
+        self.app = app_ref
+        self.title("WinExhale · Junk Cleaner")
+        self.geometry("300x220+80+80")
+        self.overrideredirect(True)
+        self.attributes("-topmost", True)
+        self.configure(fg_color=COL_BG)
+
+        self._drag_x = 0
+        self._drag_y = 0
+        self.junk_bytes = 0
+        self.freed_bytes = 0
+        
+        self.is_dragging = False
+
+        self._build_ui()
+        self._scan_async()
+
+    def _build_ui(self):
+        header = ctk.CTkFrame(self, fg_color=COL_CARD, height=32, corner_radius=0)
+        header.pack(fill="x")
+        header.bind("<ButtonPress-1>", self._start_move)
+        header.bind("<B1-Motion>", self._do_move)
+        header.bind("<ButtonRelease-1>", self._stop_move)
+
+        title_lbl = ctk.CTkLabel(
+            header, text="🧹 Junk Cleaner", text_color=COL_ACCENT,
+            font=(FONT_FAMILY, 13, "bold")
+        )
+        title_lbl.pack(side="left", padx=10)
+        title_lbl.bind("<ButtonPress-1>", self._start_move)
+        title_lbl.bind("<B1-Motion>", self._do_move)
+        title_lbl.bind("<ButtonRelease-1>", self._stop_move)
+
+        close_btn = ctk.CTkButton(
+            header, text="✕", width=24, height=24, fg_color="transparent",
+            hover_color=COL_DANGER, text_color=COL_TEXT_DIM, command=self.destroy
+        )
+        close_btn.pack(side="right", padx=4)
+
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=14, pady=12)
+
+        self.status_lbl = ctk.CTkLabel(
+            body, text="Analyse...", text_color=COL_TEXT_DIM, font=(FONT_FAMILY, 12)
+        )
+        self.status_lbl.pack(anchor="w")
+
+        self.junk_size_lbl = ctk.CTkLabel(
+            body, text="-- Mo", text_color=COL_TEXT, font=(FONT_FAMILY, 26, "bold")
+        )
+        self.junk_size_lbl.pack(anchor="w", pady=(2, 8))
+
+        self.progress = ctk.CTkProgressBar(body, progress_color=COL_ACCENT)
+        self.progress.set(0)
+        self.progress.pack(fill="x", pady=(0, 10))
+
+        self.freed_lbl = ctk.CTkLabel(
+            body, text="Libéré : 0 Mo" if self.app.lang == "fr" else "Freed: 0 MB", text_color=COL_SUCCESS, font=(FONT_FAMILY, 12)
+        )
+        self.freed_lbl.pack(anchor="w")
+
+        btn_row = ctk.CTkFrame(body, fg_color="transparent")
+        btn_row.pack(fill="x", pady=(10, 0))
+
+        self.scan_btn = ctk.CTkButton(
+            btn_row, text="🔍 Scanner" if self.app.lang == "fr" else "🔍 Scan", fg_color="transparent", border_width=1,
+            border_color=COL_ACCENT, text_color=COL_ACCENT, hover_color=COL_CARD,
+            command=self._scan_async
+        )
+        self.scan_btn.pack(side="left", expand=True, fill="x", padx=(0, 6))
+
+        self.clean_btn = ctk.CTkButton(
+            btn_row, text="🧹 Nettoyer" if self.app.lang == "fr" else "🧹 Clean", fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
+            text_color=COL_ON_ACCENT, command=self._clean_async
+        )
+        self.clean_btn.pack(side="left", expand=True, fill="x")
+
+    def _start_move(self, event):
+        self.is_dragging = True
+        self._drag_x, self._drag_y = event.x, event.y
+
+    def _do_move(self, event):
+        x = event.x_root - self._drag_x
+        y = event.y_root - self._drag_y
+        self.geometry(f"+{x}+{y}")
+        
+    def _stop_move(self, event):
+        self.is_dragging = False
+
+    def _scan_async(self):
+        self.status_lbl.configure(text="Analyse..." if self.app.lang == "fr" else "Scanning...")
+        self.scan_btn.configure(state="disabled")
+        threading.Thread(target=self._scan_worker, daemon=True).start()
+
+    def _scan_worker(self):
+        total = 0
+        dirs = [tempfile.gettempdir(), os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "Temp")]
+        dirs.extend(shader_cache_dirs() or [])
+        for d in dirs:
+            if os.path.isdir(d):
+                for root, _dirs, files in os.walk(d):
+                    for f in files:
+                        try:
+                            total += os.path.getsize(os.path.join(root, f))
+                        except OSError:
+                            pass
+        self.junk_bytes = total
+        self.after(0, self._update_scan_ui)
+
+    def _update_scan_ui(self):
+        if self.is_dragging:
+            self.after(100, self._update_scan_ui)
+            return
+        self.junk_size_lbl.configure(text=fmt_bytes(self.junk_bytes))
+        self.status_lbl.configure(text="Terminé" if self.app.lang == "fr" else "Complete")
+        self.progress.set(1.0 if self.junk_bytes > 0 else 0)
+        self.scan_btn.configure(state="normal")
+
+    def _clean_async(self):
+        self.clean_btn.configure(state="disabled")
+        threading.Thread(target=self._clean_worker, daemon=True).start()
+
+    def _clean_worker(self):
+        freed = 0
+        dirs = [tempfile.gettempdir(), os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "Temp")]
+        dirs.extend(shader_cache_dirs() or [])
+        for d in dirs:
+            if os.path.isdir(d):
+                f, _, _ = clean_directory(d)
+                freed += f
+        self.freed_bytes += freed
+        self.after(0, self._update_clean_ui)
+
+    def _update_clean_ui(self):
+        if self.is_dragging:
+            self.after(100, self._update_clean_ui)
+            return
+        txt = "Libéré : " if self.app.lang == "fr" else "Freed: "
+        self.freed_lbl.configure(text=f"{txt}{fmt_bytes(self.freed_bytes)}")
+        self.clean_btn.configure(state="normal")
+        self._scan_async()
+
+class DNSOptimizerWidget(ctk.CTkToplevel):
+    def __init__(self, app_ref):
+        super().__init__()
+        self.app = app_ref
+        self.title("WinExhale · DNS Optimizer")
+        self.geometry("300x300+420+80")
+        self.overrideredirect(True)
+        self.attributes("-topmost", True)
+        self.configure(fg_color=COL_BG)
+
+        self._drag_x = 0
+        self._drag_y = 0
+        self.results = {}
+        self.row_widgets = {}
+        self.is_dragging = False
+
+        self._build_ui()
+        self._refresh_async()
+
+    def _build_ui(self):
+        header = ctk.CTkFrame(self, fg_color=COL_CARD, height=32, corner_radius=0)
+        header.pack(fill="x")
+        header.bind("<ButtonPress-1>", self._start_move)
+        header.bind("<B1-Motion>", self._do_move)
+        header.bind("<ButtonRelease-1>", self._stop_move)
+
+        title_lbl = ctk.CTkLabel(
+            header, text="🌐 DNS Optimizer", text_color=COL_ACCENT,
+            font=(FONT_FAMILY, 13, "bold")
+        )
+        title_lbl.pack(side="left", padx=10)
+        title_lbl.bind("<ButtonPress-1>", self._start_move)
+        title_lbl.bind("<B1-Motion>", self._do_move)
+        title_lbl.bind("<ButtonRelease-1>", self._stop_move)
+
+        close_btn = ctk.CTkButton(
+            header, text="✕", width=24, height=24, fg_color="transparent",
+            hover_color=COL_DANGER, text_color=COL_TEXT_DIM, command=self.destroy
+        )
+        close_btn.pack(side="right", padx=4)
+
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=14, pady=12)
+
+        self.list_frame = ctk.CTkFrame(body, fg_color="transparent")
+        self.list_frame.pack(fill="both", expand=True)
+
+        for provider in DNS_SERVERS:
+            row = ctk.CTkFrame(self.list_frame, fg_color=COL_CARD, corner_radius=6)
+            row.pack(fill="x", pady=3)
+
+            name_lbl = ctk.CTkLabel(
+                row, text=provider["name"].replace(" Public DNS", ""), text_color=COL_TEXT,
+                font=(FONT_FAMILY, 12, "bold"), width=90, anchor="w"
+            )
+            name_lbl.pack(side="left", padx=(10, 0), pady=6)
+
+            ip_lbl = ctk.CTkLabel(
+                row, text=provider["primary"], text_color=COL_TEXT_DIM, font=(FONT_FAMILY, 11)
+            )
+            ip_lbl.pack(side="left", padx=(4, 0))
+
+            latency_lbl = ctk.CTkLabel(
+                row, text="-- ms", text_color=COL_TEXT_DIM, font=(FONT_FAMILY, 12, "bold")
+            )
+            latency_lbl.pack(side="right", padx=10)
+
+            self.row_widgets[provider["name"]] = latency_lbl
+
+        btn_row = ctk.CTkFrame(body, fg_color="transparent")
+        btn_row.pack(fill="x", pady=(10, 0))
+
+        self.refresh_btn = ctk.CTkButton(
+            btn_row, text="🔄 Retester" if self.app.lang == "fr" else "🔄 Retest", fg_color="transparent", border_width=1,
+            border_color=COL_ACCENT, text_color=COL_ACCENT, hover_color=COL_CARD,
+            command=self._refresh_async
+        )
+        self.refresh_btn.pack(side="left", expand=True, fill="x", padx=(0, 6))
+
+        self.apply_btn = ctk.CTkButton(
+            btn_row, text="⚡ Appliquer" if self.app.lang == "fr" else "⚡ Apply Best", fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
+            text_color=COL_ON_ACCENT, command=self._apply_best_async
+        )
+        self.apply_btn.pack(side="left", expand=True, fill="x")
+
+        self.reset_btn = ctk.CTkButton(
+            body, text="↩ Réinitialiser (DHCP)" if self.app.lang == "fr" else "↩ Reset (DHCP)", fg_color="transparent",
+            text_color=COL_TEXT_DIM, hover_color=COL_CARD, command=self._reset_async
+        )
+        self.reset_btn.pack(fill="x", pady=(8, 0))
+
+        self.status_lbl = ctk.CTkLabel(
+            body, text="", text_color=COL_TEXT_DIM, font=(FONT_FAMILY, 10)
+        )
+        self.status_lbl.pack(anchor="w", pady=(6, 0))
+
+    def _start_move(self, event):
+        self.is_dragging = True
+        self._drag_x, self._drag_y = event.x, event.y
+
+    def _do_move(self, event):
+        x = event.x_root - self._drag_x
+        y = event.y_root - self._drag_y
+        self.geometry(f"+{x}+{y}")
+        
+    def _stop_move(self, event):
+        self.is_dragging = False
+
+    def _badge_color(self, ms):
+        if ms is None: return COL_DANGER
+        if ms < 20: return COL_SUCCESS
+        if ms < 50: return "#D29922"
+        return COL_DANGER
+
+    def _refresh_async(self):
+        self.refresh_btn.configure(state="disabled")
+        for lbl in self.row_widgets.values():
+            lbl.configure(text="...", text_color=COL_TEXT_DIM)
+        threading.Thread(target=self._refresh_worker, daemon=True).start()
+
+    def _refresh_worker(self):
+        for provider in DNS_SERVERS:
+            ms = measure_dns_latency(provider["primary"])
+            self.results[provider["name"]] = ms
+            self.after(0, self._update_row, provider["name"], ms)
+        self.after(0, lambda: self.refresh_btn.configure(state="normal"))
+
+    def _update_row(self, name, ms):
+        if self.is_dragging:
+            self.after(100, self._update_row, name, ms)
+            return
+        lbl = self.row_widgets[name]
+        color = self._badge_color(ms)
+        text = f"{ms:.1f} ms" if ms is not None else "Timeout"
+        lbl.configure(text=text, text_color=color)
+
+    def _apply_best_async(self):
+        valid = {k: v for k, v in self.results.items() if v is not None}
+        if not valid: return
+        best_name = min(valid, key=valid.get)
+        srv = next(p for p in DNS_SERVERS if p["name"] == best_name)
+        
+        self.apply_btn.configure(state="disabled")
+        adapter = self.app.dns_adapter_label.cget("text")
+        if not adapter or adapter == self.app.t("dns_adapter_detecting"):
+            adapter = "Ethernet"
+            
+        def _apply():
+            rc, _ = run_powershell(f'netsh interface ip set dns name="{adapter}" static {srv["primary"]} primary')
+            if srv["secondary"]:
+                run_powershell(f'netsh interface ip add dns name="{adapter}" {srv["secondary"]} index=2')
+            run_powershell("ipconfig /flushdns")
+            self.after(0, lambda: (
+                self.status_lbl.configure(text=f"Applied {best_name} on {adapter}", text_color=COL_SUCCESS),
+                self.apply_btn.configure(state="normal")
+            ))
+        threading.Thread(target=_apply, daemon=True).start()
+
+    def _reset_async(self):
+        self.reset_btn.configure(state="disabled")
+        adapter = self.app.dns_adapter_label.cget("text")
+        if not adapter or adapter == self.app.t("dns_adapter_detecting"):
+            adapter = "Ethernet"
+            
+        def _reset():
+            run_powershell(f'netsh interface ip set dns name="{adapter}" dhcp')
+            run_powershell("ipconfig /flushdns")
+            self.after(0, lambda: (
+                self.status_lbl.configure(text=f"Reset {adapter} to DHCP", text_color=COL_SUCCESS),
+                self.reset_btn.configure(state="normal")
+            ))
+        threading.Thread(target=_reset, daemon=True).start()
+
 # ------------------------------------------------------------------- app ----
 
 class WinExhaleApp(ctk.CTk):
@@ -1675,6 +1995,12 @@ class WinExhaleApp(ctk.CTk):
                                   command=self.on_benchmark_dns)
         btn_bench.pack(side="left")
 
+        btn_widget = ctk.CTkButton(action_bar, text="Détacher en widget", width=140, height=34,
+                                   corner_radius=8, fg_color="transparent", border_width=1,
+                                   border_color=COL_ACCENT_DARK, text_color=COL_ACCENT,
+                                   hover_color=COL_CARD_2, command=lambda: DNSOptimizerWidget(self))
+        btn_widget.pack(side="left", padx=10)
+
         btn_apply = ctk.CTkButton(action_bar, text=self.t("btn_apply_dns"), width=200, height=34,
                                   corner_radius=8, font=(FONT_FAMILY, 12, "bold"),
                                   fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
@@ -1972,6 +2298,14 @@ class WinExhaleApp(ctk.CTk):
                             fg_color=COL_ACCENT, hover_color=COL_ACCENT_HOVER,
                             text_color=COL_ON_ACCENT, command=self.on_clean)
         btn.pack(side="right")
+        
+        btn_widget = ctk.CTkButton(bar, text="Détacher en widget", width=160, height=36,
+                                   corner_radius=8, font=(FONT_FAMILY, 12, "bold"),
+                                   fg_color="transparent", border_width=1, border_color=COL_ACCENT_DARK,
+                                   text_color=COL_ACCENT, hover_color=COL_CARD_2,
+                                   command=lambda: JunkCleanerWidget(self))
+        btn_widget.pack(side="right", padx=14)
+        
         self._busy_widgets.append(btn)
         self.freed_label = ctk.CTkLabel(bar, text="—", font=(FONT_FAMILY, 13, "bold"),
                                         text_color=COL_SUCCESS)
