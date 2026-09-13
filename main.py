@@ -50,7 +50,7 @@ if getattr(sys, "frozen", False):
             setattr(sys, _name, open(os.devnull, "w"))
 
 APP_NAME = "WinExhale"
-APP_VERSION = "1.2.8"
+APP_VERSION = "1.2.9"
 
 # ---------------------------------------------------------------- palette ---
 COL_BG = "#0B1220"
@@ -1397,6 +1397,14 @@ class WinExhaleApp(ctk.CTk):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
+        self._build_console()
+        self.after(100, self._poll_log_queue)
+        if self.lang is None:
+            self.after(150, self._startup_language_flow)
+        else:
+            self.rebuild_ui()
+        self.log(self.t("log_welcome", app=APP_NAME, v=APP_VERSION), "success")
+
     def open_junk_widget(self):
         if self.junk_widget_window is None or not self.junk_widget_window.winfo_exists():
             self.junk_widget_window = JunkCleanerWidget(master=self)
@@ -1410,14 +1418,6 @@ class WinExhaleApp(ctk.CTk):
         else:
             self.dns_widget_window.lift()
             self.dns_widget_window.focus()
-
-        self._build_console()
-        self.after(100, self._poll_log_queue)
-        if self.lang is None:
-            self.after(150, self._startup_language_flow)
-        else:
-            self.rebuild_ui()
-        self.log(self.t("log_welcome", app=APP_NAME, v=APP_VERSION), "success")
 
     # --------------------------------------------------------- helpers ----
 
