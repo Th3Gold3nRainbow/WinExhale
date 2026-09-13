@@ -1072,12 +1072,14 @@ class JunkCleanerWidget(ctk.CTkToplevel):
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        self.withdraw()  # hide until fully built
         self._build_ui()
-        
+
         self.update_idletasks()
         self.deiconify()
         self.lift()
-        
+        self.focus_force()
+
         self._scan_async()
 
     def _build_ui(self):
@@ -1136,9 +1138,18 @@ class JunkCleanerWidget(ctk.CTkToplevel):
         )
         self.clean_btn.pack(side="left", expand=True, fill="x")
 
+    def _start_native_drag(self, event):
+        try:
+            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+            if not hwnd:
+                hwnd = self.winfo_id()
+            ctypes.windll.user32.ReleaseCapture()
+            ctypes.windll.user32.SendMessageW(hwnd, 0x0112, 0xF012, 0)
+        except Exception:
+            pass
+
     def _start_move(self, event):
-        ctypes.windll.user32.ReleaseCapture()
-        ctypes.windll.user32.SendMessageW(self.winfo_id(), 0x0112, 0xF012, 0)
+        self._start_native_drag(event)
 
     def _on_close(self):
         if self.app:
@@ -1207,12 +1218,14 @@ class DNSOptimizerWidget(ctk.CTkToplevel):
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        self.withdraw()  # hide until fully built
         self._build_ui()
-        
+
         self.update_idletasks()
         self.deiconify()
         self.lift()
-        
+        self.focus_force()
+
         self._refresh_async()
 
     def _build_ui(self):
@@ -1288,9 +1301,18 @@ class DNSOptimizerWidget(ctk.CTkToplevel):
         )
         self.status_lbl.pack(anchor="w", pady=(6, 0))
 
+    def _start_native_drag(self, event):
+        try:
+            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+            if not hwnd:
+                hwnd = self.winfo_id()
+            ctypes.windll.user32.ReleaseCapture()
+            ctypes.windll.user32.SendMessageW(hwnd, 0x0112, 0xF012, 0)
+        except Exception:
+            pass
+
     def _start_move(self, event):
-        ctypes.windll.user32.ReleaseCapture()
-        ctypes.windll.user32.SendMessageW(self.winfo_id(), 0x0112, 0xF012, 0)
+        self._start_native_drag(event)
 
     def _on_close(self):
         if self.app:
@@ -1395,7 +1417,9 @@ class WinExhaleApp(ctk.CTk):
         self.dns_widget_window = None
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=0)  # header
+        self.grid_rowconfigure(1, weight=1)  # tabs
+        self.grid_rowconfigure(2, weight=0)  # console
 
         self._build_console()
         self.after(100, self._poll_log_queue)
