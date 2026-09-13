@@ -50,7 +50,7 @@ if getattr(sys, "frozen", False):
             setattr(sys, _name, open(os.devnull, "w"))
 
 APP_NAME = "WinExhale"
-APP_VERSION = "1.2.5"
+APP_VERSION = "1.2.6"
 
 # ---------------------------------------------------------------- palette ---
 COL_BG = "#0B1220"
@@ -316,8 +316,8 @@ TRANSLATIONS = {
         "log_deb_partial": "Partially removed: {name} ({n} package(s) remain)",
         "log_deb_done": "Debloat complete.",
         "log_priv_start": "Applying {n} privacy setting(s)...",
-        "log_reg_ok": "Registry: {key} -> {value} = {data}",
-        "log_reg_err": "Registry failed ({key}\\{value}): {err}",
+        "log_reg_ok": "Registry: {reg_key} -> {value} = {data}",
+        "log_reg_err": "Registry failed ({reg_key}\\{value}): {err}",
         "log_svc_ok": "Service configured: {name}",
         "log_svc_err": "Service failed ({name}): {err}",
         "log_priv_done": "Privacy settings applied.",
@@ -474,8 +474,8 @@ TRANSLATIONS = {
         "log_deb_partial": "Suppression partielle : {name} ({n} paquet(s) restant(s))",
         "log_deb_done": "Déblocage terminé.",
         "log_priv_start": "Application de {n} réglage(s)...",
-        "log_reg_ok": "Registre : {key} -> {value} = {data}",
-        "log_reg_err": "Échec registre ({key}\\{value}) : {err}",
+        "log_reg_ok": "Registre : {reg_key} -> {value} = {data}",
+        "log_reg_err": "Échec registre ({reg_key}\\{value}) : {err}",
         "log_svc_ok": "Service configuré : {name}",
         "log_svc_err": "Échec service ({name}) : {err}",
         "log_priv_done": "Réglages de confidentialité appliqués.",
@@ -1485,10 +1485,10 @@ class WinExhaleApp(ctk.CTk):
             for key, value, rtype, data in item.get("regs", []):
                 rc, out = run_simple(["reg", "add", key, "/v", value, "/t", rtype, "/d", data, "/f"])
                 if rc == 0:
-                    self.log(self.t("log_reg_ok", key=key, value=value, data=data), "info")
+                    self.log(self.t("log_reg_ok", reg_key=key, value=value, data=data), "info")
                 else:
                     err = (out or f"exit code {rc}").strip()
-                    self.log(self.t("log_reg_err", key=key, value=value, err=err), "error")
+                    self.log(self.t("log_reg_err", reg_key=key, value=value, err=err), "error")
         self.log(self.t("log_priv_done"), "success")
 
     # ---------------------------------------------------------- tab: perf ---
@@ -1643,10 +1643,12 @@ class WinExhaleApp(ctk.CTk):
             for rkey, rval, rtype, rdata in regs:
                 rc, out = run_simple(["reg", "add", rkey, "/v", rval, "/t", rtype, "/d", rdata, "/f"])
                 if rc == 0:
-                    self.log(self.t("log_reg_ok", key=rkey, value=rval, data=rdata), "info")
+                    self.log(self.t("log_reg_ok", reg_key=rkey, value=rval, data=rdata), "info")
                 else:
                     err = (out or f"exit code {rc}").strip()
-                    self.log(self.t("log_reg_err", key=rkey, value=rval, err=err), "error")
+                    self.log(self.t("log_reg_err", reg_key=rkey, value=rval, err=err), "error")
+        if any(item["key"] == "bing_search" for item, _var in selected):
+            run_powershell("Stop-Process -Name explorer -Force")
         done_key = "log_annoy_restored" if restore else "log_annoy_done"
         self.log(self.t(done_key), "success")
 
