@@ -161,6 +161,12 @@
   .module-id{font-family:var(--mono); font-size:12px; color:var(--cyan-dim);}
   .module h3{margin-top:10px; font-size:16px; font-weight:600; color:var(--text);}
   .module p{margin-top:8px; font-size:14px; color:var(--text-dim); line-height:1.55;}
+  .module-head{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .badge-new{
+    font-family:var(--mono); font-size:10.5px; font-weight:700;
+    color:var(--cyan); border:1px solid var(--cyan-dim); border-radius:20px;
+    padding:2px 8px; white-space:nowrap;
+  }
 
   /* preview */
   .preview-frame{
@@ -331,9 +337,12 @@
         <p>Kills the Sticky Keys popup, Start menu web search, lock-screen ads, and taskbar news widgets.</p>
       </div>
       <div class="module">
-        <div class="module-id">05</div>
+        <div class="module-head">
+          <div class="module-id">05</div>
+          <span class="badge-new">detachable</span>
+        </div>
         <h3>DNS Optimizer</h3>
-        <p>Benchmarks Cloudflare, Google, Quad9, and AdGuard live, then applies the fastest resolver automatically.</p>
+        <p>Benchmarks Cloudflare, Google, Quad9, and AdGuard live, then applies the fastest resolver automatically. Pop it out into a small floating widget to keep latency in view while you work.</p>
       </div>
       <div class="module">
         <div class="module-id">06</div>
@@ -346,15 +355,25 @@
         <p>Scans registry and folder startup entries and toggles them non-destructively — full rollback, always.</p>
       </div>
       <div class="module">
-        <div class="module-id">08</div>
+        <div class="module-head">
+          <div class="module-id">08</div>
+          <span class="badge-new">detachable</span>
+        </div>
         <h3>Deep Junk &amp; Cache Cleaner</h3>
-        <p>Clears temp files, DNS cache, and GPU shader cache, with a live counter of space freed.</p>
+        <p>Clears temp files, DNS cache, and GPU shader cache, with a live counter of space freed. Also available as a floating widget you can leave open on the desktop.</p>
       </div>
       <div class="module">
         <div class="module-id">09</div>
         <h3>Bilingual Interface</h3>
         <p>Full English/French localization with instant switching, in the same dark cyan theme throughout.</p>
       </div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="safety" style="border-left-color:var(--cyan);">
+      <h3>New — detach any module into a floating widget</h3>
+      <p>The Junk Cleaner and DNS Optimizer can now pop out of the main console into small, always-on-top panels you can leave running on the desktop. Drag them anywhere, watch cache get reclaimed or DNS latency update live, and close them back into the main window whenever you're done — the rest of WinExhale keeps running underneath.</p>
     </div>
   </section>
 
