@@ -5,12 +5,14 @@
 **The Ultimate Open-Source Windows Debloater, Privacy Engine & Performance Suite**
 
 [![GitHub Release](https://img.shields.io/github/v/release/Th3Gold3nRainbow/WinExhale?style=for-the-badge&logo=github&color=06B6D4)](https://github.com/Th3Gold3nRainbow/WinExhale/releases/latest)
+[![Version](https://img.shields.io/badge/Version-v1.3.0-06B6D4?style=for-the-badge&logo=tag&logoColor=white)](https://github.com/Th3Gold3nRainbow/WinExhale/releases/tag/v1.3.0)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Th3Gold3nRainbow/WinExhale)
 [![Python Version](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg?style=for-the-badge)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/Th3Gold3nRainbow/WinExhale/total?style=for-the-badge&color=8B5CF6&logo=github)](https://github.com/Th3Gold3nRainbow/WinExhale/releases)
 
 <p align="center">
+  <a href="#-whats-new-in-v130">What's New (v1.3.0)</a> •
   <a href="#-key-features">Features</a> •
   <a href="#-download--installation">Download</a> •
   <a href="#-preview--interface">Preview</a> •
@@ -20,6 +22,25 @@
 </p>
 
 </div>
+
+---
+
+## 🚀 What's New in v1.3.0
+
+### 🪟 Detachable Floating Widgets
+WinExhale v1.3.0 introduces lightweight, detachable mini-tools designed for rapid access right from your desktop without needing to keep the full suite open:
+
+- **🧹 Floating Junk Cleaner**:
+  - **Quick Desktop-Level Cache & Junk Purging**: Clean temporary files, system logs, and cache on demand with a single click.
+  - **Live Cleaned Size Reporting**: Real-time counter calculates and displays exact freed disk space directly on the widget.
+- **🌐 Floating DNS Optimizer**:
+  - **Fast DNS Benchmark**: Ping and evaluate top DNS providers (Cloudflare, Google, Quad9) with real-time latency badges.
+  - **Real-Time Provider Switching**: Instantly switch adapters to high-performance DNS resolvers without opening the main window.
+- **⚡ Advanced Window Architecture**:
+  - **Frameless & Aesthetic**: Minimalist, dark-themed borderless overlay matching WinExhale's cyber aesthetic.
+  - **Always-on-Top**: Floats conveniently over other windows and fullscreen applications for effortless multitasking.
+  - **Safe Tkinter-Native Dragging**: Smooth, flicker-free window movement using cached root-coordinate offsets that never block the UI thread or cause window manager exceptions.
+  - **Singleton Window Management**: Intelligent instance control ensures only a single instance of each widget exists, automatically focusing and lifting existing windows if triggered again.
 
 ---
 
@@ -60,6 +81,7 @@ Built with Python and a sleek dark CustomTkinter interface, WinExhale gives powe
 - ⏱️ **Live Resolver Benchmarking**: Pings top DNS providers (Cloudflare, Google, Quad9, AdGuard) with real-time color badges (Green < 20ms, Yellow < 50ms, Red > 50ms).
 - 🔄 **Dynamic Adapter Switching**: Identifies active network interfaces and applies optimal DNS settings via PowerShell.
 - 🔁 **DHCP One-Click Reset**: Instant rollback to automatic DNS with automatic resolver cache flush (`ipconfig /flushdns`).
+- 🪟 **Detachable Floating Mini-Widget**: Benchmark and switch DNS providers directly from a floating, always-on-top desktop overlay without opening the main window.
 
 ### 📦 6. App Installer (Winget Integration)
 - 🚀 **One-Click Multi-App Deployment**: Install essential software seamlessly across 5 categories (Browsers, Utilities, Media, Gaming, Dev Tools).
@@ -74,6 +96,7 @@ Built with Python and a sleek dark CustomTkinter interface, WinExhale gives powe
 - 🌐 **DNS & Network Flush**: Clears local resolver caches to resolve connectivity hiccups.
 - 🎮 **Shader & GPU Cache Refresh**: Flushes obsolete DirectX/GPU shader caches for stutter-free gaming.
 - 📊 **Real-Time Savings Counter**: Displays exact freed disk space live.
+- 🪟 **Detachable Floating Mini-Widget**: Rapid desktop-level junk purging with live freed size reporting in an ultra-compact overlay.
 
 ### 🌐 9. Bilingual & Modern UI
 - 🎨 **Sleek Cyber-Dark Theme**: Native dark theme with vibrant cyan accents.
@@ -95,13 +118,13 @@ Built with Python and a sleek dark CustomTkinter interface, WinExhale gives powe
 
 ### Option A: Setup Installer (Recommended)
 Download the latest multi-language installer wizard with desktop shortcuts and automatic uninstaller:
-1. Go to the [**Latest GitHub Release**](https://github.com/Th3Gold3nRainbow/WinExhale/releases/latest).
-2. Download `WinExhale_Setup.exe`.
+1. Go to the [**Latest GitHub Release (v1.3.0)**](https://github.com/Th3Gold3nRainbow/WinExhale/releases/latest).
+2. Download `WinExhale_v1.3.0_Setup_Installer.exe` (or `WinExhale_Setup.exe`).
 3. Run the installer and follow the setup wizard.
 
 ### Option B: Standalone Portable EXE
-1. Download `WinExhale.exe` directly from the [**Releases Page**](https://github.com/Th3Gold3nRainbow/WinExhale/releases/latest).
-2. Run `WinExhale.exe` anywhere (USB drive, Desktop). Requires Administrator elevation (UAC prompt).
+1. Download `WinExhale_v1.3.0_Portable.exe` (or `WinExhale.exe`) directly from the [**Releases Page**](https://github.com/Th3Gold3nRainbow/WinExhale/releases/latest).
+2. Run anywhere (USB drive, Desktop). Requires Administrator elevation (UAC prompt).
 
 ---
 
