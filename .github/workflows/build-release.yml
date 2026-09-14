@@ -42,7 +42,7 @@ jobs:
 
       - name: Build Standalone Executable (PyInstaller)
         run: |
-          pyinstaller --noconsole --onefile --uac-admin --icon=app_icon.ico --add-data="app_logo.png;." --add-data="app_icon.ico;." --name="WinExhale_v1.2.9_Portable" main.py
+          pyinstaller --noconsole --onefile --uac-admin --icon=app_icon.ico --add-data="app_logo.png;." --add-data="app_icon.ico;." --name="WinExhale_v1.3.0_Portable" main.py
 
       - name: Install Inno Setup
         run: |
@@ -52,14 +52,24 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 
+      - name: Verify PyInstaller output
+        shell: pwsh
+        run: |
+          if (-Not (Test-Path "dist\WinExhale_v1.3.0_Portable.exe")) {
+            Write-Error "Expected build output missing. dist/ contents:"
+            Get-ChildItem dist -ErrorAction SilentlyContinue
+            exit 1
+          }
+          Write-Host "PyInstaller output verified: dist\WinExhale_v1.3.0_Portable.exe"
+
       - name: Verify Build Artifacts
         shell: pwsh
         run: |
-          if (-not (Test-Path "dist\WinExhale_v1.2.9_Portable.exe")) {
-            throw "Error: dist\WinExhale_v1.2.9_Portable.exe was not created!"
+          if (-not (Test-Path "dist\WinExhale_v1.3.0_Portable.exe")) {
+            throw "Error: dist\WinExhale_v1.3.0_Portable.exe was not created!"
           }
-          if (-not (Test-Path "installer_output\WinExhale_v1.2.9_Setup_Installer.exe")) {
-            throw "Error: installer_output\WinExhale_v1.2.9_Setup_Installer.exe was not created!"
+          if (-not (Test-Path "installer_output\WinExhale_v1.3.0_Setup_Installer.exe")) {
+            throw "Error: installer_output\WinExhale_v1.3.0_Setup_Installer.exe was not created!"
           }
           Write-Host "All release binaries successfully built!"
           Get-ChildItem -Path dist, installer_output -Filter *.exe | Select-Object Name, Length
@@ -69,8 +79,8 @@ jobs:
         with:
           name: WinExhale-Binaries
           path: |
-            dist/WinExhale_v1.2.9_Portable.exe
-            installer_output/WinExhale_v1.2.9_Setup_Installer.exe
+            dist/WinExhale_v1.3.0_Portable.exe
+            installer_output/WinExhale_v1.3.0_Setup_Installer.exe
           if-no-files-found: error
 
       - name: Create GitHub Release & Upload Assets
@@ -83,7 +93,7 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            dist/WinExhale_v1.2.9_Portable.exe
-            installer_output/WinExhale_v1.2.9_Setup_Installer.exe
+            dist/WinExhale_v1.3.0_Portable.exe
+            installer_output/WinExhale_v1.3.0_Setup_Installer.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
