@@ -1,14 +1,471 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WinExhale — Modern Windows Optimization Tool</title>
-    <meta name="google-site-verification" content="hsJbENh1Rw4Z0WQWC30OZqJK6whpM8sRFTEEk7SiDy8" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WinExhale — Windows Debloater, Privacy Engine &amp; Performance Suite</title>
+<meta name="description" content="WinExhale is an open-source Windows debloater, privacy engine, and performance suite. Strip bloatware, kill telemetry, optimize DNS, and reclaim disk space — one click at a time.">
+<meta property="og:title" content="WinExhale — Windows Debloater, Privacy Engine & Performance Suite">
+<meta property="og:description" content="Open-source, MIT-licensed Windows utility to strip bloatware, disable telemetry, and speed up Windows 10 & 11.">
+<meta property="og:image" content="https://raw.githubusercontent.com/Th3Gold3nRainbow/WinExhale/main/ui_preview.png">
+<meta property="og:type" content="website">
+<meta name="google-site-verification" content="hsJbENh1Rw4Z0WQWC30OZqJK6whpM8sRFTEEk7SiDy8" />
+<link rel="icon" href="https://raw.githubusercontent.com/Th3Gold3nRainbow/WinExhale/main/app_icon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e14;
+    --bg-panel:#10151f;
+    --bg-panel-alt:#131a27;
+    --border:#212b3d;
+    --border-soft:#171f2d;
+    --cyan:#22d3ee;
+    --cyan-dim:#0e7f97;
+    --text:#dbe4f0;
+    --text-dim:#6b7d99;
+    --green:#4ade80;
+    --red:#f87171;
+    --mono:'JetBrains Mono', ui-monospace, Consolas, monospace;
+    --sans:'Inter', system-ui, sans-serif;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit; text-decoration:none;}
+  img{max-width:100%; display:block;}
+  ::selection{background:var(--cyan); color:#04141a;}
+
+  :focus-visible{outline:2px solid var(--cyan); outline-offset:3px;}
+
+  .wrap{max-width:1080px; margin:0 auto; padding:0 28px;}
+
+  /* ---------- nav ---------- */
+  header{
+    position:sticky; top:0; z-index:50;
+    background:rgba(10,14,20,0.86);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border-soft);
+  }
+  nav{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 0;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    font-family:var(--mono); font-weight:700; font-size:17px; letter-spacing:-0.01em;
+  }
+  .brand-dot{width:8px; height:8px; border-radius:50%; background:var(--cyan); box-shadow:0 0 10px var(--cyan);}
+  .nav-links{display:flex; align-items:center; gap:28px; font-size:14px; color:var(--text-dim);}
+  .nav-links a:hover{color:var(--text);}
+  .btn{
+    font-family:var(--mono); font-size:13.5px; font-weight:500;
+    padding:9px 18px; border-radius:5px; border:1px solid var(--border);
+    transition:border-color .15s ease, background .15s ease;
+    display:inline-flex; align-items:center; gap:8px;
+    white-space:nowrap;
+  }
+  .btn-primary{background:var(--cyan); border-color:var(--cyan); color:#04141a; font-weight:700;}
+  .btn-primary:hover{background:#3ddcf5;}
+  .btn-ghost{color:var(--text); }
+  .btn-ghost:hover{border-color:var(--cyan-dim); color:var(--cyan);}
+
+  /* ---------- hero ---------- */
+  .hero{padding:76px 0 64px;}
+  .hero-grid{display:grid; grid-template-columns:1.05fr 0.95fr; gap:56px; align-items:center;}
+  h1{
+    font-family:var(--mono); font-weight:800; letter-spacing:-0.02em;
+    font-size:44px; line-height:1.12; color:#fff;
+  }
+  h1 span{color:var(--cyan);}
+  .hero p.lede{
+    margin-top:20px; font-size:17px; color:var(--text-dim); max-width:46ch;
+  }
+  .hero-actions{margin-top:32px; display:flex; gap:12px; flex-wrap:wrap;}
+  .hero-meta{
+    margin-top:28px; font-family:var(--mono); font-size:12.5px; color:var(--text-dim);
+    display:flex; gap:18px; flex-wrap:wrap;
+  }
+  .hero-meta b{color:var(--text);}
+
+  /* terminal */
+  .terminal{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    overflow:hidden;
+    box-shadow:0 0 0 1px rgba(34,211,238,0.03), 0 24px 60px -30px rgba(34,211,238,0.18);
+  }
+  .terminal-bar{
+    display:flex; align-items:center; gap:7px;
+    padding:11px 14px; border-bottom:1px solid var(--border-soft);
+    background:var(--bg-panel-alt);
+  }
+  .terminal-bar span{width:10px; height:10px; border-radius:50%; background:#2a3446;}
+  .terminal-bar small{
+    margin-left:8px; font-family:var(--mono); font-size:11.5px; color:var(--text-dim);
+  }
+  .terminal-body{
+    padding:20px 18px; font-family:var(--mono); font-size:13.5px; min-height:238px;
+  }
+  .terminal-body .line{margin-bottom:7px; white-space:pre-wrap; opacity:0;}
+  .terminal-body .prompt{color:var(--cyan);}
+  .terminal-body .ok{color:var(--green);}
+  .terminal-body .warn{color:var(--red);}
+  .terminal-body .dim{color:var(--text-dim);}
+  .cursor{
+    display:inline-block; width:8px; height:15px; background:var(--cyan);
+    vertical-align:middle; animation:blink 1s step-end infinite;
+  }
+  @keyframes blink{50%{opacity:0;}}
+
+  /* ---------- stat strip ---------- */
+  .stats{
+    border-top:1px solid var(--border-soft);
+    border-bottom:1px solid var(--border-soft);
+  }
+  .stats-grid{
+    display:grid; grid-template-columns:repeat(4,1fr);
+  }
+  .stat-cell{
+    padding:26px 20px;
+    border-left:1px solid var(--border-soft);
+    text-align:center;
+  }
+  .stat-cell:first-child{border-left:none;}
+  .stat-num{font-family:var(--mono); font-weight:700; font-size:26px; color:var(--cyan);}
+  .stat-label{margin-top:6px; font-size:12.5px; color:var(--text-dim);}
+
+  /* ---------- sections ---------- */
+  section{padding:88px 0;}
+  .section-head{max-width:56ch; margin-bottom:44px;}
+  .section-head h2{
+    font-family:var(--mono); font-size:28px; font-weight:700; color:#fff; letter-spacing:-0.01em;
+  }
+  .section-head p{margin-top:12px; color:var(--text-dim); font-size:15.5px;}
+
+  /* modules grid */
+  .modules{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:1px;
+    background:var(--border-soft); border:1px solid var(--border-soft);
+  }
+  .module{background:var(--bg); padding:26px 24px;}
+  .module-id{font-family:var(--mono); font-size:12px; color:var(--cyan-dim);}
+  .module h3{margin-top:10px; font-size:16px; font-weight:600; color:var(--text);}
+  .module p{margin-top:8px; font-size:14px; color:var(--text-dim); line-height:1.55;}
+
+  /* preview */
+  .preview-frame{
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:10px;
+    background:linear-gradient(180deg, var(--bg-panel-alt), var(--bg-panel));
+  }
+  .preview-frame img{border-radius:5px; border:1px solid var(--border-soft);}
+  .preview-caption{
+    margin-top:14px; font-family:var(--mono); font-size:12.5px; color:var(--text-dim); text-align:center;
+  }
+
+  /* safety */
+  .safety{
+    border-left:3px solid var(--cyan);
+    background:var(--bg-panel);
+    padding:28px 30px;
+    border-radius:0 8px 8px 0;
+  }
+  .safety h3{font-size:17px; color:#fff; font-weight:600;}
+  .safety p{margin-top:10px; color:var(--text-dim); font-size:14.5px; max-width:64ch;}
+
+  /* build steps */
+  .steps{counter-reset:step;}
+  .step{
+    display:grid; grid-template-columns:40px 1fr; gap:18px;
+    padding:20px 0; border-top:1px solid var(--border-soft);
+  }
+  .step:last-child{border-bottom:1px solid var(--border-soft);}
+  .step-num{
+    counter-increment:step;
+    font-family:var(--mono); color:var(--cyan); font-weight:700; font-size:14px;
+  }
+  .step-num::before{content: counter(step, decimal-leading-zero);}
+  .step h4{font-size:14.5px; font-weight:600; color:var(--text); margin-bottom:8px;}
+  .step code{
+    display:block; background:var(--bg-panel); border:1px solid var(--border-soft);
+    border-radius:5px; padding:10px 12px; font-family:var(--mono); font-size:12.8px;
+    color:var(--green); overflow-x:auto; white-space:pre;
+  }
+
+  /* download */
+  .download{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:44px;
+    display:flex; align-items:center; justify-content:space-between; gap:32px; flex-wrap:wrap;
+  }
+  .download h2{font-family:var(--mono); font-size:24px; color:#fff;}
+  .download p{margin-top:8px; color:var(--text-dim); font-size:14.5px; max-width:44ch;}
+  .download-actions{display:flex; gap:12px; flex-wrap:wrap;}
+
+  footer{
+    border-top:1px solid var(--border-soft);
+    padding:36px 0;
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px;
+  }
+  footer .brand{font-size:14px;}
+  .footer-links{display:flex; gap:22px; font-size:13.5px; color:var(--text-dim);}
+  .footer-links a:hover{color:var(--cyan);}
+
+  @media (max-width:860px){
+    .hero-grid{grid-template-columns:1fr;}
+    .modules{grid-template-columns:1fr 1fr;}
+    .stats-grid{grid-template-columns:1fr 1fr;}
+    .stat-cell:nth-child(3){border-left:none;}
+    h1{font-size:34px;}
+  }
+  @media (max-width:560px){
+    .modules{grid-template-columns:1fr;}
+    .nav-links{display:none;}
+    .download{flex-direction:column; align-items:flex-start;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto;}
+    .cursor{animation:none;}
+    .terminal-body .line{opacity:1 !important;}
+  }
+</style>
 </head>
-<body style="background:#0d1117; color:#E6EDF3; font-family:sans-serif; text-align:center; padding:50px;">
-    <h1>WinExhale</h1>
-    <p>Modern Windows Optimization, Privacy & Debloating Tool.</p>
-    <p><a href="https://github.com/Th3Gold3nRainbow/WinExhale" style="color:#06B6D4;">View on GitHub</a></p>
+<body>
+
+<header>
+  <nav class="wrap">
+    <div class="brand"><span class="brand-dot"></span>WinExhale</div>
+    <div class="nav-links">
+      <a href="#modules">Modules</a>
+      <a href="#preview">Preview</a>
+      <a href="#build">Build from source</a>
+      <a href="https://github.com/Th3Gold3nRainbow/WinExhale/issues">Issues</a>
+    </div>
+    <a class="btn btn-primary" href="https://github.com/Th3Gold3nRainbow/WinExhale/releases/latest">Download</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero wrap">
+    <div class="hero-grid">
+      <div>
+        <h1>Strip the bloat.<br>Keep <span>control</span>.</h1>
+        <p class="lede">WinExhale is an open-source debloater, privacy engine, and performance suite for Windows 10 and 11. One interface to remove OEM junk, shut down telemetry, tune your DNS, and reclaim disk space — nothing hidden, nothing automatic without your click.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="https://github.com/Th3Gold3nRainbow/WinExhale/releases/latest">Download latest release</a>
+          <a class="btn btn-ghost" href="https://github.com/Th3Gold3nRainbow/WinExhale">View source on GitHub</a>
+        </div>
+        <div class="hero-meta">
+          <span><b>MIT</b> licensed</span>
+          <span><b>Python 3.10+</b></span>
+          <span>Windows <b>10 &amp; 11</b></span>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span></span><span></span><span></span>
+          <small>winexhale — scan</small>
+        </div>
+        <div class="terminal-body" id="term">
+          <div class="line"><span class="prompt">$</span> winexhale --scan</div>
+          <div class="line dim">12 OEM bloatware packages detected</div>
+          <div class="line">DiagTrack telemetry&nbsp; <span class="warn">ACTIVE</span></div>
+          <div class="line">Advertising ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="warn">ENABLED</span></div>
+          <div class="line">DNS latency (current)&nbsp; 41ms</div>
+          <div class="line">Reclaimable cache&nbsp;&nbsp;&nbsp; 3.8 GB</div>
+          <div class="line dim">Restore point: not yet created</div>
+          <div class="line"><span class="prompt">$</span> <span class="cursor"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats">
+    <div class="wrap stats-grid">
+      <div class="stat-cell"><div class="stat-num">9</div><div class="stat-label">modules</div></div>
+      <div class="stat-cell"><div class="stat-num">1-click</div><div class="stat-label">restore point safety net</div></div>
+      <div class="stat-cell"><div class="stat-num">EN/FR</div><div class="stat-label">full localization</div></div>
+      <div class="stat-cell"><div class="stat-num">MIT</div><div class="stat-label">open source license</div></div>
+    </div>
+  </section>
+
+  <section id="modules" class="wrap">
+    <div class="section-head">
+      <h2>Nine modules, one console</h2>
+      <p>Every tool WinExhale ships with, built around the same principle: show exactly what's about to change before it changes.</p>
+    </div>
+    <div class="modules">
+      <div class="module">
+        <div class="module-id">01</div>
+        <h3>Windows Debloater</h3>
+        <p>Removes preinstalled OEM apps, Cortana, Xbox overlays, and promotional software through official Appx removal APIs.</p>
+      </div>
+      <div class="module">
+        <div class="module-id">02</div>
+        <h3>Privacy &amp; Telemetry Hardening</h3>
+        <p>Disables DiagTrack, the Advertising ID, Windows Error Reporting, and Cortana's cloud search tracking.</p>
+      </div>
+      <div class="module">
+        <div class="module-id">03</div>
+        <h3>Performance &amp; Game Mode</h3>
+        <p>Switches to a low-latency power plan and streamlines SysMain and indexing — revert to default anytime.</p>
+      </div>
+      <div class="module">
+        <div class="module-id">04</div>
+        <h3>Windows Annoyances</h3>
+        <p>Kills the Sticky Keys popup, Start menu web search, lock-screen ads, and taskbar news widgets.</p>
+      </div>
+      <div class="module">
+        <div class="module-id">05</div>
+        <h3>DNS Optimizer</h3>
+        <p>Benchmarks Cloudflare, Google, Quad9, and AdGuard live, then applies the fastest resolver automatically.</p>
+      </div>
+      <div class="module">
+        <div class="module-id">06</div>
+        <h3>App Installer</h3>
+        <p>Deploys common software through winget across five categories, with live terminal output as it runs.</p>
+      </div>
+      <div class="module">
+        <div class="module-id">07</div>
+        <h3>Safe Startup Manager</h3>
+        <p>Scans registry and folder startup entries and toggles them non-destructively — full rollback, always.</p>
+      </div>
+      <div class="module">
+        <div class="module-id">08</div>
+        <h3>Deep Junk &amp; Cache Cleaner</h3>
+        <p>Clears temp files, DNS cache, and GPU shader cache, with a live counter of space freed.</p>
+      </div>
+      <div class="module">
+        <div class="module-id">09</div>
+        <h3>Bilingual Interface</h3>
+        <p>Full English/French localization with instant switching, in the same dark cyan theme throughout.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="preview" class="wrap">
+    <div class="section-head">
+      <h2>What it looks like</h2>
+      <p>A single dark, responsive console — every action logged in real time, nothing running silently in the background.</p>
+    </div>
+    <div class="preview-frame">
+      <img src="https://raw.githubusercontent.com/Th3Gold3nRainbow/WinExhale/main/ui_preview.png" alt="WinExhale interface showing the module console with live logging" loading="lazy">
+    </div>
+    <div class="preview-caption">WinExhale main console — CustomTkinter, cyber-dark theme</div>
+  </section>
+
+  <section class="wrap">
+    <div class="safety">
+      <h3>Nothing changes without a safety net</h3>
+      <p>WinExhale creates a System Restore Point before batch operations and keeps non-destructive backups of every startup item it touches. Toggling something off keeps the original entry intact — turning it back on restores it exactly as it was. Review any tweak before you apply it; nothing runs automatically.</p>
+    </div>
+  </section>
+
+  <section id="build" class="wrap">
+    <div class="section-head">
+      <h2>Build from source</h2>
+      <p>Requires Windows 10 or 11, Python 3.10+, and Git.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num"></div>
+        <div>
+          <h4>Clone the repository</h4>
+          <code>git clone https://github.com/Th3Gold3nRainbow/WinExhale.git
+cd WinExhale</code>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div>
+          <h4>Install dependencies</h4>
+          <code>python -m pip install --upgrade pip
+pip install -r requirements.txt</code>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div>
+          <h4>Generate icons and logo assets</h4>
+          <code>python generate_assets.py</code>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div>
+          <h4>Run it locally</h4>
+          <code>python main.py</code>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div>
+          <h4>Compile a standalone executable</h4>
+          <code>pyinstaller WinExhale.spec --noconfirm --clean</code>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num"></div>
+        <div>
+          <h4>Optional — build the Inno Setup installer</h4>
+          <code>ISCC.exe installer.iss</code>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="download">
+      <div>
+        <h2>Get WinExhale</h2>
+        <p>Grab the installer for desktop shortcuts and an uninstaller, or run the portable .exe from anywhere — no install needed.</p>
+      </div>
+      <div class="download-actions">
+        <a class="btn btn-primary" href="https://github.com/Th3Gold3nRainbow/WinExhale/releases/latest">Latest release</a>
+        <a class="btn btn-ghost" href="https://github.com/Th3Gold3nRainbow/WinExhale#-building-from-source">Build instructions</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap">
+  <div class="brand"><span class="brand-dot"></span>WinExhale</div>
+  <div class="footer-links">
+    <a href="https://github.com/Th3Gold3nRainbow/WinExhale">GitHub</a>
+    <a href="https://github.com/Th3Gold3nRainbow/WinExhale/issues">Issues</a>
+    <a href="https://github.com/Th3Gold3nRainbow/WinExhale/blob/main/LICENSE">MIT License</a>
+  </div>
+</footer>
+
+<script>
+  // single orchestrated hero sequence: reveal terminal lines like a live scan
+  (function(){
+    var lines = document.querySelectorAll('#term .line');
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) { lines.forEach(function(l){ l.style.opacity = 1; }); return; }
+    lines.forEach(function(line, i){
+      setTimeout(function(){
+        line.style.transition = 'opacity .25s ease';
+        line.style.opacity = 1;
+      }, 260 * i + 200);
+    });
+  })();
+</script>
+
 </body>
 </html>
