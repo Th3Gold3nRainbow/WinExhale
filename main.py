@@ -1,5 +1,5 @@
 """
-WinExhale — Windows Debloater, Privacy & Performance Suite (v1.2.0)
+WinExhale — Windows Debloater, Privacy & Performance Suite (v1.3.0)
 
 Features
   * English / French UI, chosen on first launch, stored in winexhale_config.json
@@ -20,6 +20,7 @@ Runtime requirements:  pip install customtkinter pillow pywin32
 """
 
 import ctypes
+from ctypes import wintypes
 import json
 import os
 import queue
@@ -50,7 +51,9 @@ if getattr(sys, "frozen", False):
             setattr(sys, _name, open(os.devnull, "w"))
 
 APP_NAME = "WinExhale"
-APP_VERSION = "1.2.9"
+APP_VERSION = "1.3.0"
+
+# (Win32 drag declarations removed — widgets use pure-Tkinter coordinate drag)
 
 # ---------------------------------------------------------------- palette ---
 COL_BG = "#0B1220"
@@ -64,6 +67,7 @@ COL_TEXT_DIM = "#8FA3BF"
 COL_SUCCESS = "#34D399"
 COL_WARN = "#FBBF24"
 COL_ERROR = "#F87171"
+COL_DANGER = "#F87171"   # alias used by widget close-button hover
 COL_CONSOLE_BG = "#0A0F1B"
 COL_ON_ACCENT = "#052530"
 
@@ -1069,6 +1073,8 @@ class JunkCleanerWidget(ctk.CTkToplevel):
 
         self.junk_bytes = 0
         self.freed_bytes = 0
+        self._offset_x = 0
+        self._offset_y = 0
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -1086,6 +1092,7 @@ class JunkCleanerWidget(ctk.CTkToplevel):
         header = ctk.CTkFrame(self, fg_color=COL_CARD, height=32, corner_radius=0)
         header.pack(fill="x")
         header.bind("<ButtonPress-1>", self._start_move)
+        header.bind("<B1-Motion>", self._do_move)
 
         title_lbl = ctk.CTkLabel(
             header, text="🧹 " + self.app.t("widget_junk_title"), text_color=COL_ACCENT,
@@ -1093,6 +1100,7 @@ class JunkCleanerWidget(ctk.CTkToplevel):
         )
         title_lbl.pack(side="left", padx=10)
         title_lbl.bind("<ButtonPress-1>", self._start_move)
+        title_lbl.bind("<B1-Motion>", self._do_move)
 
         close_btn = ctk.CTkButton(
             header, text="✕", width=24, height=24, fg_color="transparent",
@@ -1138,18 +1146,19 @@ class JunkCleanerWidget(ctk.CTkToplevel):
         )
         self.clean_btn.pack(side="left", expand=True, fill="x")
 
-    def _start_native_drag(self, event):
-        try:
-            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
-            if not hwnd:
-                hwnd = self.winfo_id()
-            ctypes.windll.user32.ReleaseCapture()
-            ctypes.windll.user32.SendMessageW(hwnd, 0x0112, 0xF012, 0)
-        except Exception:
-            pass
-
     def _start_move(self, event):
-        self._start_native_drag(event)
+        """Record the cursor offset relative to the window origin on press."""
+        self._offset_x = event.x_root - self.winfo_x()
+        self._offset_y = event.y_root - self.winfo_y()
+
+    def _do_move(self, event):
+        """Reposition the window using the cached root-coordinate offset.
+        Uses x_root/y_root (screen-absolute) minus the recorded offset so the
+        window manager is not queried on every pixel of motion.
+        """
+        x = event.x_root - self._offset_x
+        y = event.y_root - self._offset_y
+        self.geometry(f"+{x}+{y}")
 
     def _on_close(self):
         if self.app:
@@ -1215,6 +1224,8 @@ class DNSOptimizerWidget(ctk.CTkToplevel):
 
         self.results = {}
         self.row_widgets = {}
+        self._offset_x = 0
+        self._offset_y = 0
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -1232,6 +1243,7 @@ class DNSOptimizerWidget(ctk.CTkToplevel):
         header = ctk.CTkFrame(self, fg_color=COL_CARD, height=32, corner_radius=0)
         header.pack(fill="x")
         header.bind("<ButtonPress-1>", self._start_move)
+        header.bind("<B1-Motion>", self._do_move)
 
         title_lbl = ctk.CTkLabel(
             header, text="🌐 " + self.app.t("widget_dns_title"), text_color=COL_ACCENT,
@@ -1239,6 +1251,7 @@ class DNSOptimizerWidget(ctk.CTkToplevel):
         )
         title_lbl.pack(side="left", padx=10)
         title_lbl.bind("<ButtonPress-1>", self._start_move)
+        title_lbl.bind("<B1-Motion>", self._do_move)
 
         close_btn = ctk.CTkButton(
             header, text="✕", width=24, height=24, fg_color="transparent",
@@ -1301,18 +1314,19 @@ class DNSOptimizerWidget(ctk.CTkToplevel):
         )
         self.status_lbl.pack(anchor="w", pady=(6, 0))
 
-    def _start_native_drag(self, event):
-        try:
-            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
-            if not hwnd:
-                hwnd = self.winfo_id()
-            ctypes.windll.user32.ReleaseCapture()
-            ctypes.windll.user32.SendMessageW(hwnd, 0x0112, 0xF012, 0)
-        except Exception:
-            pass
-
     def _start_move(self, event):
-        self._start_native_drag(event)
+        """Record the cursor offset relative to the window origin on press."""
+        self._offset_x = event.x_root - self.winfo_x()
+        self._offset_y = event.y_root - self.winfo_y()
+
+    def _do_move(self, event):
+        """Reposition the window using the cached root-coordinate offset.
+        Uses x_root/y_root (screen-absolute) minus the recorded offset so the
+        window manager is not queried on every pixel of motion.
+        """
+        x = event.x_root - self._offset_x
+        y = event.y_root - self._offset_y
+        self.geometry(f"+{x}+{y}")
 
     def _on_close(self):
         if self.app:
@@ -1430,18 +1444,24 @@ class WinExhaleApp(ctk.CTk):
         self.log(self.t("log_welcome", app=APP_NAME, v=APP_VERSION), "success")
 
     def open_junk_widget(self):
-        if self.junk_widget_window is None or not self.junk_widget_window.winfo_exists():
+        try:
+            if self.junk_widget_window is not None and self.junk_widget_window.winfo_exists():
+                self.junk_widget_window.lift()
+                self.junk_widget_window.focus()
+                return
             self.junk_widget_window = JunkCleanerWidget(master=self)
-        else:
-            self.junk_widget_window.lift()
-            self.junk_widget_window.focus()
+        except Exception as e:
+            self.log(f"[ERROR] Failed to open Junk Cleaner widget: {e}", "error")
 
     def open_dns_widget(self):
-        if self.dns_widget_window is None or not self.dns_widget_window.winfo_exists():
+        try:
+            if self.dns_widget_window is not None and self.dns_widget_window.winfo_exists():
+                self.dns_widget_window.lift()
+                self.dns_widget_window.focus()
+                return
             self.dns_widget_window = DNSOptimizerWidget(master=self)
-        else:
-            self.dns_widget_window.lift()
-            self.dns_widget_window.focus()
+        except Exception as e:
+            self.log(f"[ERROR] Failed to open DNS Optimizer widget: {e}", "error")
 
     # --------------------------------------------------------- helpers ----
 
